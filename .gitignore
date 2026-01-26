@@ -1,0 +1,39 @@
+# Azure Developer CLI
+.azure/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node modules (if any local scripts)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Terraform (if used)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Logs
+*.log
+logs/
+
+# Credentials (never commit these)
+**/credentials/
+**/secrets/
+*.pem
+*.key
+
+# Build outputs
+dist/
+build/

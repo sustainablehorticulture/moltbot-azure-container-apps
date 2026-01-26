@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "anthropicApiKey": {
+      "value": "${ANTHROPIC_API_KEY}"
+    },
+    "openRouterApiKey": {
+      "value": "${OPENROUTER_API_KEY}"
+    },
+    "openaiApiKey": {
+      "value": "${OPENAI_API_KEY}"
+    },
+    "telegramBotToken": {
+      "value": "${TELEGRAM_BOT_TOKEN}"
+    },
+    "telegramAllowedUserId": {
+      "value": "${TELEGRAM_ALLOWED_USER_ID}"
+    },
+    "discordBotToken": {
+      "value": "${DISCORD_BOT_TOKEN}"
+    },
+    "discordAllowedUsers": {
+      "value": "${DISCORD_ALLOWED_USERS}"
+    },
+    "clawdbotGatewayToken": {
+      "value": "${CLAWDBOT_GATEWAY_TOKEN}"
+    },
+    "clawdbotPersonaName": {
+      "value": "${CLAWDBOT_PERSONA_NAME=Clawd}"
+    },
+    "clawdbotModel": {
+      "value": "${CLAWDBOT_MODEL=openrouter/anthropic/claude-3.5-sonnet}"
+    },
+    "allowedIpRanges": {
+      "value": "${ALLOWED_IP_RANGES}"
+    },
+    "internalOnly": {
+      "value": "${INTERNAL_ONLY=false}"
+    },
+    "enableAlerts": {
+      "value": "${ENABLE_ALERTS=true}"
+    },
+    "alertEmailAddress": {
+      "value": "${ALERT_EMAIL_ADDRESS}"
+    }
+  }
+}

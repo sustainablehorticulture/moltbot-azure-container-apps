@@ -1,0 +1,24 @@
+{
+  "agent": {
+    "model": "${CLAWDBOT_MODEL:-anthropic/claude-opus-4-5}"
+  },
+  "gateway": {
+    "port": 18789,
+    "bind": "0.0.0.0",
+    "auth": {
+      "mode": "open"
+    }
+  },
+  "channels": {
+    "telegram": {
+      "botToken": "${TELEGRAM_BOT_TOKEN}",
+      "allowFrom": ["${TELEGRAM_ALLOWED_USER_ID}"]
+    },
+    "discord": {
+      "token": "${DISCORD_BOT_TOKEN}"
+    }
+  },
+  "browser": {
+    "enabled": false
+  }
+}
