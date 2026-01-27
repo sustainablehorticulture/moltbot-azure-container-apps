@@ -68,36 +68,72 @@ Before deploying, you need a Discord bot token:
 1. In Discord: Settings → Advanced → Enable **Developer Mode**
 2. Right-click your username → **Copy User ID**
 
-### Step 2: Deploy with azd up
+### Step 2: Provision Infrastructure
 
 ```bash
 # Clone this sample
-git clone https://github.com/Azure-Samples/clawdbot-azure-container-apps.git
+git clone https://github.com/BandaruDheeraj/clawdbot-azure-container-apps.git
 cd clawdbot-azure-container-apps
 
 # Login to Azure
 azd auth login
 
-# Deploy everything (you'll be prompted for values)
-azd up
+# Provision infrastructure (creates ACR, Container Apps Environment, etc.)
+azd provision
 ```
 
 When prompted, enter:
 - **Environment name**: e.g., `clawdbot-prod`
 - **Azure subscription**: Select your subscription
 - **Location**: e.g., `eastus2`
-- **OpenRouter API Key**: Your key from [openrouter.ai/keys](https://openrouter.ai/keys)
-- **Discord Bot Token**: The token from Step 1
-- **Discord Allowed Users**: Your Discord user ID from Step 1
 
-The deployment takes about 5-7 minutes and:
-1. Creates Azure Container Registry
-2. Builds ClawdBot from source (no local Docker needed!)
-3. Creates Container Apps Environment
-4. Deploys ClawdBot with all your configuration
-5. Sets up monitoring via Log Analytics
+### Step 3: Build the Container Image
 
-### Step 3: Invite Bot to Server & Test
+**⚠️ Required before deploying.** The container image must exist in ACR first.
+
+```bash
+# Get your ACR name
+ACR_NAME=$(az acr list --resource-group rg-clawdbot-prod --query "[0].name" -o tsv)
+
+# Build the image in Azure (no local Docker needed!)
+az acr build --registry $ACR_NAME --image "clawdbot:latest" --file src/clawdbot/Dockerfile src/clawdbot/
+```
+
+This takes about 3-5 minutes.
+
+### Step 4: Configure Your Credentials
+
+```bash
+# Set your required secrets
+azd env set OPENROUTER_API_KEY "sk-or-v1-your-key-here"
+azd env set DISCORD_BOT_TOKEN "your-discord-bot-token"
+azd env set DISCORD_ALLOWED_USERS "your-discord-user-id"
+```
+
+**Where to get these values:**
+
+| Variable | Where to Get It |
+|----------|-----------------|
+| `OPENROUTER_API_KEY` | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| `DISCORD_BOT_TOKEN` | Discord Developer Portal → Your App → Bot → Reset Token |
+| `DISCORD_ALLOWED_USERS` | Discord → Settings → Advanced → Developer Mode → Right-click username → Copy User ID |
+
+**Optional settings:**
+
+```bash
+azd env set CLAWDBOT_MODEL "openrouter/anthropic/claude-3.5-sonnet"
+azd env set CLAWDBOT_PERSONA_NAME "Clawd"
+azd env set ALLOWED_IP_RANGES "1.2.3.4/32"  # IP restrictions
+azd env set ALERT_EMAIL_ADDRESS "your-email@example.com"
+```
+
+### Step 5: Deploy the Application
+
+```bash
+azd deploy
+```
+
+### Step 6: Invite Bot to Server & Test
 
 1. **Open the OAuth2 URL** from Step 1 to invite the bot to a server
 2. **Find the bot** in the server's member list
@@ -123,8 +159,9 @@ The deployment takes about 5-7 minutes and:
 azd env set DISCORD_ALLOWED_USERS "user1-id,user2-id"
 azd deploy
 
-# Update to latest ClawdBot version
-azd deploy  # Rebuilds from source automatically
+# Rebuild image with latest ClawdBot
+az acr build --registry $ACR_NAME --image "clawdbot:latest" --file src/clawdbot/Dockerfile src/clawdbot/
+azd deploy
 ```
 
 ---
