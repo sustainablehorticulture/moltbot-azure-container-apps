@@ -99,7 +99,12 @@ ACR_NAME=$(az acr list --resource-group rg-clawdbot-prod --query "[0].name" -o t
 az acr build --registry $ACR_NAME --image "clawdbot:latest" --file src/clawdbot/Dockerfile src/clawdbot/
 ```
 
-This takes about 3-5 minutes.
+This takes about 3-5 minutes. The Dockerfile automatically:
+1. Clones the official [ClawdBot source](https://github.com/clawdbot/clawdbot) from GitHub
+2. Installs dependencies and builds the app
+3. Adds our custom `entrypoint.sh` for Azure configuration
+
+> **Note:** You don't need to download ClawdBot separately - it's pulled fresh during the build.
 
 ### Step 4: Configure Your Credentials
 
