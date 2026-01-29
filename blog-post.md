@@ -709,12 +709,13 @@ This sample uses **OpenRouter** as the model provider because it offers easy acc
 
 #### Integration Status
 
-We tested Azure AI Foundry integration and found:
+We tested Azure AI Foundry integration directly and found:
 
 | Test | Result |
 |------|--------|
-| **Azure OpenAI API** | ✅ Works - Successfully called GPT-4.1 deployment |
-| **MoltBot Direct Integration** | ⚠️ Requires proxy - Azure uses different auth format |
+| **Azure OpenAI API with `api-key` header** | ✅ Works - Response: "4" (correctly answered 2+2) |
+| **Azure OpenAI API with Bearer auth** | ❌ Failed - HTTP 401 Unauthorized |
+| **MoltBot Direct Integration** | ❌ Not compatible - MoltBot sends Bearer auth |
 
 **The Challenge:** Azure OpenAI uses a different authentication pattern than standard OpenAI:
 
