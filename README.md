@@ -383,32 +383,6 @@ azd deploy
 
 See [OpenRouter Models](https://openrouter.ai/models) for the full list.
 
-### Alternative: Azure AI Foundry
-
-This sample uses **OpenRouter** for simplicity, but you can also use **Azure AI Foundry** (formerly Azure OpenAI Service) for enhanced security and compliance:
-
-| Feature | OpenRouter | Azure AI Foundry |
-|---------|:----------:|:----------------:|
-| Data residency | Third-party | Your Azure subscription |
-| Private networking | ❌ Public API | ✅ Private Endpoints |
-| Managed Identity | ❌ API key only | ✅ Passwordless auth |
-
-**Integration Status:** Azure AI Foundry works with MoltBot but requires a proxy like [LiteLLM](https://github.com/BerriAI/litellm) because Azure OpenAI uses a different auth format (`api-key` header instead of `Authorization: Bearer`).
-
-**Quick Setup with LiteLLM:**
-```bash
-# Run LiteLLM proxy for Azure OpenAI
-pip install litellm
-export AZURE_API_KEY="<your-key>"
-export AZURE_API_BASE="https://<resource>.openai.azure.com"
-litellm --model azure/<deployment-name> --port 4000
-
-# Configure MoltBot to use LiteLLM (in moltbot.json)
-# "models": { "providers": { "azure-proxy": { "baseUrl": "http://localhost:4000/v1" } } }
-```
-
-See the [blog post](./blog-post.md#-alternative-azure-ai-foundry) for detailed Azure AI Foundry configuration instructions.
-
 ### How the Entrypoint Works
 
 The `entrypoint.sh` script dynamically generates MoltBot's configuration from environment variables at container startup:
