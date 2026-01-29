@@ -9,7 +9,7 @@ metaDescription: "Complete guide to deploying MoltBot on Azure Container Apps. O
 author: "Dheeraj Bandaru"
 ---
 
-# 🦋 Deploy MoltBot to Azure Container Apps: Your 24/7 AI Assistant in 30 Minutes
+# 🦞 Deploy MoltBot to Azure Container Apps: Your 24/7 AI Assistant in 30 Minutes
 
 ---
 
@@ -498,7 +498,7 @@ Here's what's running in your Azure subscription:
 │  │                  Azure Container Apps Environment                       ││
 │  │                                                                          ││
 │  │  ┌────────────────────────────────────────────────────────────────┐     ││
-│  │  │                    🦋 MoltBot Container App                    │     ││
+│  │  │                    🦞 MoltBot Container App                    │     ││
 │  │  │                                                                  │     ││
 │  │  │  Gateway     → Control plane for sessions and tools             │     ││
 │  │  │  Control UI  → Web dashboard for management                     │     ││
@@ -1109,7 +1109,7 @@ Once your MoltBot is running, explore these capabilities:
 
 ## 🎯 Key Takeaways
 
-**🦋 MoltBot on Azure Container Apps** gives you the best of both worlds:
+**🦞 MoltBot on Azure Container Apps** gives you the best of both worlds:
 
 | Benefit | What It Means |
 |---------|---------------|

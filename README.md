@@ -1,10 +1,10 @@
-# 🦋 MoltBot on Azure Container Apps
+# 🦞 MoltBot on Azure Container Apps
 
 Deploy your personal AI assistant to Azure Container Apps with Discord integration. This sample shows how to run [MoltBot](https://molt.bot) - an open-source personal AI assistant - on Azure's serverless container platform.
 
 ## What You'll Get
 
-- 🦋 **MoltBot AI Assistant** running on Azure Container Apps
+- 🦞 **MoltBot AI Assistant** running on Azure Container Apps
 - 💬 **Discord Integration** - Chat with your AI via Discord DMs
 - 🔐 **Secure by Default** - Gateway token authentication + DM allowlist
 - 📊 **Azure Monitoring** - Full observability via Log Analytics
@@ -676,4 +676,4 @@ During the development of this sample, we discovered several important details:
 
 ---
 
-> 🦋 Built with MoltBot. Questions? Check [docs.molt.bot](https://docs.molt.bot)
+> 🦞 Built with MoltBot. Questions? Check [docs.molt.bot](https://docs.molt.bot)

@@ -63,7 +63,7 @@ cat > "${CONFIG_FILE}" << EOF
         "identity": {
           "name": "${MOLTBOT_PERSONA_NAME:-Molt}",
           "theme": "helpful assistant",
-          "emoji": "🦋"
+          "emoji": "🦞"
         }
       }
     ]
