@@ -1,10 +1,10 @@
-# 🦞 ClawdBot on Azure Container Apps
+# 🦋 MoltBot on Azure Container Apps
 
-Deploy your personal AI assistant to Azure Container Apps with Discord integration. This sample shows how to run [ClawdBot](https://clawd.bot) - an open-source personal AI assistant - on Azure's serverless container platform.
+Deploy your personal AI assistant to Azure Container Apps with Discord integration. This sample shows how to run [MoltBot](https://molt.bot) - an open-source personal AI assistant - on Azure's serverless container platform.
 
 ## What You'll Get
 
-- 🦞 **ClawdBot AI Assistant** running on Azure Container Apps
+- 🦋 **MoltBot AI Assistant** running on Azure Container Apps
 - 💬 **Discord Integration** - Chat with your AI via Discord DMs
 - 🔐 **Secure by Default** - Gateway token authentication + DM allowlist
 - 📊 **Azure Monitoring** - Full observability via Log Analytics
@@ -19,7 +19,7 @@ Deploy your personal AI assistant to Azure Container Apps with Discord integrati
 │  │                  Azure Container Apps Environment                       ││
 │  │                                                                         ││
 │  │  ┌───────────────────────────────────────────────────────────────────┐  ││
-│  │  │                    ClawdBot Container App                          │  ││
+│  │  │                    MoltBot Container App                          │  ││
 │  │  │                                                                    │  ││
 │  │  │  • Gateway (port 18789)          • Discord Bot Connection         │  ││
 │  │  │  • Control UI (web chat)         • OpenRouter API Integration     │  ││
@@ -30,7 +30,7 @@ Deploy your personal AI assistant to Azure Container Apps with Discord integrati
 │  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐ │
 │  │  Container Registry │  │   Managed Identity  │  │  Log Analytics     │ │
 │  │                     │  │                     │  │                     │ │
-│  │  Stores ClawdBot    │  │  Secure ACR access  │  │  Logs & metrics    │ │
+│  │  Stores MoltBot    │  │  Secure ACR access  │  │  Logs & metrics    │ │
 │  │  container image    │  │  (no passwords!)    │  │  for monitoring    │ │
 │  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -46,14 +46,14 @@ Deploy your personal AI assistant to Azure Container Apps with Discord integrati
 
 ## One-Click Deployment with azd
 
-The fastest way to deploy ClawdBot is using Azure Developer CLI (`azd`). This provisions all infrastructure, builds the container image, and deploys everything in one command.
+The fastest way to deploy MoltBot is using Azure Developer CLI (`azd`). This provisions all infrastructure, builds the container image, and deploys everything in one command.
 
 ### Step 1: Create Discord Bot (Do This First!)
 
 Before deploying, you need a Discord bot token:
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click **New Application** → Name it (e.g., "ClawdBot-Azure")
+2. Click **New Application** → Name it (e.g., "MoltBot-Azure")
 3. Go to **Bot** → Click **Add Bot** (or **Reset Token** if exists)
 4. Enable these **Privileged Gateway Intents**:
    - ✅ Message Content Intent
@@ -72,8 +72,8 @@ Before deploying, you need a Discord bot token:
 
 ```bash
 # Clone this sample
-git clone https://github.com/BandaruDheeraj/clawdbot-azure-container-apps.git
-cd clawdbot-azure-container-apps
+git clone https://github.com/BandaruDheeraj/moltbot-azure-container-apps.git
+cd moltbot-azure-container-apps
 
 # Login to Azure
 azd auth login
@@ -83,7 +83,7 @@ azd provision
 ```
 
 When prompted, enter:
-- **Environment name**: e.g., `clawdbot-prod`
+- **Environment name**: e.g., `MoltBot-prod`
 - **Azure subscription**: Select your subscription
 - **Location**: e.g., `eastus2`
 
@@ -93,24 +93,24 @@ When prompted, enter:
 
 ```bash
 # Get your ACR name
-ACR_NAME=$(az acr list --resource-group rg-clawdbot-prod --query "[0].name" -o tsv)
+ACR_NAME=$(az acr list --resource-group rg-MoltBot-prod --query "[0].name" -o tsv)
 
 # Build the image in Azure (no local Docker needed!)
-az acr build --registry $ACR_NAME --image "clawdbot:latest" --file src/clawdbot/Dockerfile src/clawdbot/
+az acr build --registry $ACR_NAME --image "MoltBot:latest" --file src/MoltBot/Dockerfile src/MoltBot/
 ```
 
 **Understanding this command:**
 - `--registry $ACR_NAME` - Build in your ACR (in the cloud)
-- `--image "clawdbot:latest"` - Name the output image (we choose this name)
-- `--file src/clawdbot/Dockerfile` - Use the Dockerfile from this repo
-- `src/clawdbot/` - Send this folder as build context
+- `--image "MoltBot:latest"` - Name the output image (we choose this name)
+- `--file src/MoltBot/Dockerfile` - Use the Dockerfile from this repo
+- `src/MoltBot/` - Send this folder as build context
 
 This takes about 3-5 minutes. The Dockerfile automatically:
-1. Clones the official [ClawdBot source](https://github.com/clawdbot/clawdbot) from GitHub
+1. Clones the official [MoltBot source](https://github.com/MoltBot/MoltBot) from GitHub
 2. Installs dependencies and builds the app
 3. Adds our custom `entrypoint.sh` for Azure configuration
 
-> **Note:** You don't need to download ClawdBot separately - it's pulled fresh during the build. The resulting image is stored in your ACR as `clawdbot:latest`.
+> **Note:** You don't need to download MoltBot separately - it's pulled fresh during the build. The resulting image is stored in your ACR as `MoltBot:latest`.
 
 ### Step 4: Configure Your Credentials
 
@@ -132,8 +132,8 @@ azd env set DISCORD_ALLOWED_USERS "your-discord-user-id"
 **Optional settings:**
 
 ```bash
-azd env set CLAWDBOT_MODEL "openrouter/anthropic/claude-3.5-sonnet"
-azd env set CLAWDBOT_PERSONA_NAME "Clawd"
+azd env set MOLTBOT_MODEL "openrouter/anthropic/claude-3.5-sonnet"
+azd env set MOLTBOT_PERSONA_NAME "Clawd"
 azd env set ALLOWED_IP_RANGES "1.2.3.4/32"  # IP restrictions
 azd env set ALERT_EMAIL_ADDRESS "your-email@example.com"
 ```
@@ -156,9 +156,9 @@ azd deploy
 
 | Resource | Purpose |
 |----------|---------|
-| Azure Container Registry | Stores your ClawdBot container image |
+| Azure Container Registry | Stores your MoltBot container image |
 | Container Apps Environment | Hosting platform with built-in scaling |
-| ClawdBot Container App | Your AI assistant (1 CPU, 2GB RAM) |
+| MoltBot Container App | Your AI assistant (1 CPU, 2GB RAM) |
 | Managed Identity | Secure passwordless access to ACR |
 | Log Analytics Workspace | Logs and monitoring |
 | Storage Account | Persistent data storage |
@@ -170,8 +170,8 @@ azd deploy
 azd env set DISCORD_ALLOWED_USERS "user1-id,user2-id"
 azd deploy
 
-# Rebuild image with latest ClawdBot
-az acr build --registry $ACR_NAME --image "clawdbot:latest" --file src/clawdbot/Dockerfile src/clawdbot/
+# Rebuild image with latest MoltBot
+az acr build --registry $ACR_NAME --image "MoltBot:latest" --file src/MoltBot/Dockerfile src/MoltBot/
 azd deploy
 ```
 
@@ -185,12 +185,12 @@ If you prefer to deploy step-by-step without `azd`, follow these instructions:
 
 ```bash
 # Variables - customize these
-RESOURCE_GROUP="rg-clawdbot"
+RESOURCE_GROUP="rg-MoltBot"
 LOCATION="eastus2"
-ENVIRONMENT_NAME="cae-clawdbot"
-ACR_NAME="crclawdbot$(openssl rand -hex 4)"  # Must be globally unique
-IDENTITY_NAME="clawdbot-identity"
-APP_NAME="clawdbot"
+ENVIRONMENT_NAME="cae-MoltBot"
+ACR_NAME="crMoltBot$(openssl rand -hex 4)"  # Must be globally unique
+IDENTITY_NAME="MoltBot-identity"
+APP_NAME="MoltBot"
 
 # Create resource group
 az group create --name $RESOURCE_GROUP --location $LOCATION
@@ -217,21 +217,21 @@ az containerapp env create \
   --location $LOCATION
 ```
 
-### Step 2: Build ClawdBot Image
+### Step 2: Build MoltBot Image
 
-ClawdBot must be built from source. We use Azure Container Registry Tasks (no local Docker required):
+MoltBot must be built from source. We use Azure Container Registry Tasks (no local Docker required):
 
 ```bash
 # Build the image in ACR (runs in the cloud)
 az acr build \
   --registry $ACR_NAME \
-  --image "clawdbot:v1" \
-  --file src/clawdbot/Dockerfile \
-  src/clawdbot/
+  --image "MoltBot:v1" \
+  --file src/MoltBot/Dockerfile \
+  src/MoltBot/
 ```
 
 This takes about 5 minutes. The build:
-1. Clones ClawdBot from GitHub
+1. Clones MoltBot from GitHub
 2. Installs dependencies with pnpm
 3. Builds the TypeScript application
 4. Builds the Control UI
@@ -240,7 +240,7 @@ This takes about 5 minutes. The build:
 ### Step 3: Create Discord Bot
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click **New Application** → Name it (e.g., "ClawdBot-Azure")
+2. Click **New Application** → Name it (e.g., "MoltBot-Azure")
 3. Go to **Bot** → Click **Add Bot**
 4. Enable these **Privileged Gateway Intents**:
    - ✅ Message Content Intent
@@ -277,7 +277,7 @@ az containerapp create \
   --name $APP_NAME \
   --resource-group $RESOURCE_GROUP \
   --environment $ENVIRONMENT_NAME \
-  --image "${ACR_NAME}.azurecr.io/clawdbot:v1" \
+  --image "${ACR_NAME}.azurecr.io/MoltBot:v1" \
   --registry-server "${ACR_NAME}.azurecr.io" \
   --registry-identity $IDENTITY_ID \
   --user-assigned $IDENTITY_ID \
@@ -294,10 +294,10 @@ az containerapp create \
   --env-vars \
     "OPENROUTER_API_KEY=secretref:openrouter-api-key" \
     "DISCORD_BOT_TOKEN=secretref:discord-bot-token" \
-    "CLAWDBOT_GATEWAY_TOKEN=secretref:gateway-token" \
+    "MOLTBOT_GATEWAY_TOKEN=secretref:gateway-token" \
     "DISCORD_ALLOWED_USERS=$DISCORD_USER_ID" \
-    "CLAWDBOT_MODEL=openrouter/anthropic/claude-3.5-sonnet" \
-    "CLAWDBOT_PERSONA_NAME=Clawd" \
+    "MOLTBOT_MODEL=openrouter/anthropic/claude-3.5-sonnet" \
+    "MOLTBOT_PERSONA_NAME=Clawd" \
     "GATEWAY_PORT=18789" \
     "NODE_ENV=production"
 ```
@@ -342,10 +342,10 @@ https://<your-app-url>/?token=<your-gateway-token>
 |----------|----------|-------------|
 | `OPENROUTER_API_KEY` | ✅ | OpenRouter API key for LLM access |
 | `DISCORD_BOT_TOKEN` | ✅ | Discord bot token from Developer Portal |
-| `CLAWDBOT_GATEWAY_TOKEN` | ✅ | Random token for gateway authentication |
+| `MOLTBOT_GATEWAY_TOKEN` | ✅ | Random token for gateway authentication |
 | `DISCORD_ALLOWED_USERS` | ✅ | Your Discord user ID (DM allowlist) |
-| `CLAWDBOT_MODEL` | No | Model ID (default: `openrouter/anthropic/claude-3.5-sonnet`) |
-| `CLAWDBOT_PERSONA_NAME` | No | Bot name (default: `Clawd`) |
+| `MOLTBOT_MODEL` | No | Model ID (default: `openrouter/anthropic/claude-3.5-sonnet`) |
+| `MOLTBOT_PERSONA_NAME` | No | Bot name (default: `Clawd`) |
 
 ### Security Parameters (azd)
 
@@ -383,9 +383,32 @@ azd deploy
 
 See [OpenRouter Models](https://openrouter.ai/models) for the full list.
 
+### Alternative: Azure AI Foundry
+
+This sample uses **OpenRouter** for simplicity, but you can also use **Azure AI Foundry** (formerly Azure OpenAI Service) for enhanced security and compliance:
+
+| Feature | OpenRouter | Azure AI Foundry |
+|---------|:----------:|:----------------:|
+| Data residency | Third-party | Your Azure subscription |
+| Private networking | ❌ Public API | ✅ Private Endpoints |
+| Managed Identity | ❌ API key only | ✅ Passwordless auth |
+
+**To use Azure AI Foundry:**
+
+1. Deploy a model in Azure AI Foundry
+2. Configure MoltBot to use the OpenAI-compatible endpoint:
+   ```bash
+   azd env set OPENAI_API_KEY "<your-ai-foundry-key>"
+   azd env set OPENAI_API_BASE "<your-ai-foundry-endpoint>"
+   azd env set MOLTBOT_MODEL "azure/gpt-4o"
+   azd deploy
+   ```
+
+See the [blog post](./blog-post.md#-alternative-azure-ai-foundry) for detailed Azure AI Foundry configuration instructions.
+
 ### How the Entrypoint Works
 
-The `entrypoint.sh` script dynamically generates ClawdBot's configuration from environment variables at container startup:
+The `entrypoint.sh` script dynamically generates MoltBot's configuration from environment variables at container startup:
 
 ```json
 {
@@ -410,7 +433,7 @@ The `entrypoint.sh` script dynamically generates ClawdBot's configuration from e
 This approach:
 - Keeps secrets out of the container image
 - Allows configuration changes without rebuilding
-- Generates proper ClawdBot JSON config format
+- Generates proper MoltBot JSON config format
 
 ## Updating Your Bot
 
@@ -419,7 +442,7 @@ This approach:
 ```bash
 # Change model
 az containerapp update --name $APP_NAME --resource-group $RESOURCE_GROUP \
-  --set-env-vars "CLAWDBOT_MODEL=openrouter/anthropic/claude-3-opus"
+  --set-env-vars "MOLTBOT_MODEL=openrouter/anthropic/claude-3-opus"
 
 # Add another allowed Discord user
 az containerapp update --name $APP_NAME --resource-group $RESOURCE_GROUP \
@@ -438,16 +461,16 @@ REVISION=$(az containerapp show --name $APP_NAME --resource-group $RESOURCE_GROU
 az containerapp revision restart --name $APP_NAME --resource-group $RESOURCE_GROUP --revision $REVISION
 ```
 
-### Update ClawdBot Version
+### Update MoltBot Version
 
 ```bash
-# Rebuild with latest ClawdBot
-az acr build --registry $ACR_NAME --image "clawdbot:v2" \
-  --file src/clawdbot/Dockerfile src/clawdbot/
+# Rebuild with latest MoltBot
+az acr build --registry $ACR_NAME --image "MoltBot:v2" \
+  --file src/MoltBot/Dockerfile src/MoltBot/
 
 # Deploy new image
 az containerapp update --name $APP_NAME --resource-group $RESOURCE_GROUP \
-  --image "${ACR_NAME}.azurecr.io/clawdbot:v2"
+  --image "${ACR_NAME}.azurecr.io/MoltBot:v2"
 ```
 
 ## Monitoring
@@ -469,7 +492,7 @@ az containerapp logs show --name $APP_NAME --resource-group $RESOURCE_GROUP \
 ✅ **Healthy startup:**
 ```
 Discord channel configured: yes (DM allowlist: 123456789)
-ClawdBot configuration written to /home/node/.clawdbot/clawdbot.json
+MoltBot configuration written to /home/node/.MoltBot/MoltBot.json
 Gateway token configured: yes
 [discord] logged in to discord as 987654321
 [gateway] agent model: openrouter/anthropic/claude-3.5-sonnet
@@ -521,7 +544,7 @@ The model ID format is very specific. Common mistakes:
 
 1. Check if image exists:
    ```bash
-   az acr repository show-tags --name $ACR_NAME --repository clawdbot
+   az acr repository show-tags --name $ACR_NAME --repository MoltBot
    ```
 
 2. Verify managed identity has ACR pull permission:
@@ -562,7 +585,7 @@ The deployment includes four Azure Monitor alerts (enabled by default):
 
 ### Enable IP Restrictions
 
-Restrict who can access your ClawdBot gateway:
+Restrict who can access your MoltBot gateway:
 
 ```bash
 # Only allow specific IPs (e.g., your home + VPN)
@@ -579,7 +602,7 @@ azd env set INTERNAL_ONLY "true"
 azd deploy
 ```
 
-This makes ClawdBot accessible only from within your Azure VNet.
+This makes MoltBot accessible only from within your Azure VNet.
 
 ### Key Rotation
 
@@ -587,13 +610,13 @@ Rotate API keys without rebuilding:
 
 ```bash
 # Rotate OpenRouter API key
-az containerapp secret set --name clawdbot --resource-group $RESOURCE_GROUP \
+az containerapp secret set --name MoltBot --resource-group $RESOURCE_GROUP \
   --secrets "openrouter-api-key=sk-or-v1-new-key"
 
 # Restart to apply
-REVISION=$(az containerapp show --name clawdbot --resource-group $RESOURCE_GROUP \
+REVISION=$(az containerapp show --name MoltBot --resource-group $RESOURCE_GROUP \
   --query "properties.latestRevisionName" -o tsv)
-az containerapp revision restart --name clawdbot --resource-group $RESOURCE_GROUP \
+az containerapp revision restart --name MoltBot --resource-group $RESOURCE_GROUP \
   --revision $REVISION
 ```
 
@@ -633,7 +656,7 @@ az group delete --name $RESOURCE_GROUP --yes --no-wait
 
 During the development of this sample, we discovered several important details:
 
-1. **ClawdBot requires config file, not just env vars** - The gateway reads from `~/.clawdbot/clawdbot.json`, so we need an entrypoint script to generate it from environment variables.
+1. **MoltBot requires config file, not just env vars** - The gateway reads from `~/.MoltBot/MoltBot.json`, so we need an entrypoint script to generate it from environment variables.
 
 2. **Config schema matters** - Use `agents.defaults` and `agents.list[].identity`, not the legacy `agent` and `identity` format.
 
@@ -645,12 +668,12 @@ During the development of this sample, we discovered several important details:
 
 ## Resources
 
-- [ClawdBot Documentation](https://docs.clawd.bot)
-- [ClawdBot Discord Channel Setup](https://docs.clawd.bot/channels/discord)
-- [ClawdBot Model Providers](https://docs.clawd.bot/concepts/model-providers)
+- [MoltBot Documentation](https://docs.molt.bot)
+- [MoltBot Discord Channel Setup](https://docs.molt.bot/channels/discord)
+- [MoltBot Model Providers](https://docs.molt.bot/concepts/model-providers)
 - [OpenRouter API](https://openrouter.ai)
 - [Azure Container Apps Documentation](https://learn.microsoft.com/azure/container-apps)
 
 ---
 
-> 🦞 Built with ClawdBot. Questions? Check [docs.clawd.bot](https://docs.clawd.bot)
+> 🦋 Built with MoltBot. Questions? Check [docs.molt.bot](https://docs.molt.bot)

@@ -1,11 +1,11 @@
 #!/bin/bash
-# ClawdBot Azure Container Apps Entrypoint
+# MoltBot Azure Container Apps Entrypoint
 # Generates configuration from environment variables and starts the gateway
 
 set -e
 
-CONFIG_DIR="${HOME}/.clawdbot"
-CONFIG_FILE="${CONFIG_DIR}/clawdbot.json"
+CONFIG_DIR="${HOME}/.moltbot"
+CONFIG_FILE="${CONFIG_DIR}/moltbot.json"
 
 # Create config directory
 mkdir -p "${CONFIG_DIR}"
@@ -47,23 +47,23 @@ if [ -n "${DISCORD_CONFIG}" ]; then
   },'
 fi
 
-# Generate ClawdBot configuration using current schema format
+# Generate MoltBot configuration using current schema format
 cat > "${CONFIG_FILE}" << EOF
 {
   "agents": {
     "defaults": {
-      "workspace": "${HOME}/clawd",
+      "workspace": "${HOME}/molt",
       "model": {
-        "primary": "${CLAWDBOT_MODEL:-openrouter/anthropic/claude-3.5-sonnet}"
+        "primary": "${MOLTBOT_MODEL:-openrouter/anthropic/claude-3.5-sonnet}"
       }
     },
     "list": [
       {
         "id": "main",
         "identity": {
-          "name": "${CLAWDBOT_PERSONA_NAME:-Clawd}",
+          "name": "${MOLTBOT_PERSONA_NAME:-Molt}",
           "theme": "helpful assistant",
-          "emoji": "🦞"
+          "emoji": "🦋"
         }
       }
     ]
@@ -77,7 +77,7 @@ cat > "${CONFIG_FILE}" << EOF
     },
     "auth": {
       "mode": "token",
-      "token": "${CLAWDBOT_GATEWAY_TOKEN}"
+      "token": "${MOLTBOT_GATEWAY_TOKEN}"
     }
   },
   "logging": {
@@ -88,8 +88,8 @@ cat > "${CONFIG_FILE}" << EOF
 }
 EOF
 
-echo "ClawdBot configuration written to ${CONFIG_FILE}"
-echo "Gateway token configured: $([ -n "${CLAWDBOT_GATEWAY_TOKEN}" ] && echo 'yes' || echo 'no')"
+echo "MoltBot configuration written to ${CONFIG_FILE}"
+echo "Gateway token configured: $([ -n "${MOLTBOT_GATEWAY_TOKEN}" ] && echo 'yes' || echo 'no')"
 
-# Start ClawdBot Gateway with --allow-unconfigured to allow running without messaging channels
+# Start MoltBot Gateway with --allow-unconfigured to allow running without messaging channels
 exec node dist/index.js gateway --bind lan --port "${GATEWAY_PORT:-18789}" --allow-unconfigured "$@"

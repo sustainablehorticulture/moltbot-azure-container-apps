@@ -1,6 +1,6 @@
-# ClawdBot on Azure Container Apps
-# This Dockerfile builds ClawdBot from source with Azure-specific configurations
-# Based on https://docs.clawd.bot/platforms/gcp
+# MoltBot on Azure Container Apps
+# This Dockerfile builds MoltBot from source with Azure-specific configurations
+# Based on https://docs.molt.bot/platforms/gcp
 
 FROM node:22-bookworm
 
@@ -28,9 +28,9 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Clone ClawdBot repository
-ARG CLAWDBOT_VERSION=main
-RUN git clone --depth 1 --branch ${CLAWDBOT_VERSION} https://github.com/clawdbot/clawdbot.git .
+# Clone MoltBot repository
+ARG MOLTBOT_VERSION=main
+RUN git clone --depth 1 --branch ${MOLTBOT_VERSION} https://github.com/moltbot/moltbot.git .
 
 # Enable corepack for pnpm
 RUN corepack enable
@@ -38,7 +38,7 @@ RUN corepack enable
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Build ClawdBot
+# Build MoltBot
 RUN pnpm build
 
 # Build UI
@@ -46,7 +46,7 @@ RUN pnpm ui:install
 RUN pnpm ui:build
 
 # Create persistent directories
-RUN mkdir -p /home/node/.clawdbot /home/node/clawd
+RUN mkdir -p /home/node/.moltbot /home/node/molt
 
 # Copy entrypoint script
 COPY entrypoint.sh /app/entrypoint.sh
@@ -57,7 +57,7 @@ ENV NODE_ENV=production
 ENV GATEWAY_PORT=18789
 ENV GATEWAY_BIND=0.0.0.0
 ENV HOME=/home/node
-ENV XDG_CONFIG_HOME=/home/node/.clawdbot
+ENV XDG_CONFIG_HOME=/home/node/.moltbot
 ENV TERM=xterm-256color
 ENV PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -68,5 +68,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # Expose the Gateway port
 EXPOSE 18789
 
-# Start ClawdBot Gateway via entrypoint (generates config from env vars)
+# Start MoltBot Gateway via entrypoint (generates config from env vars)
 ENTRYPOINT ["/app/entrypoint.sh"]
