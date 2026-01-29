@@ -692,7 +692,7 @@ azd deploy
 
 ---
 
-### � Alternative: Azure AI Foundry
+### 🏭 Alternative: Azure AI Foundry
 
 This sample uses **OpenRouter** as the model provider because it offers easy access to multiple AI models through a single API. However, you can also use **Azure AI Foundry** (formerly Azure OpenAI Service) to host your models directly within Azure for enhanced security and compliance.
 
@@ -707,73 +707,88 @@ This sample uses **OpenRouter** as the model provider because it offers easy acc
 | **Managed Identity** | ❌ API key only | ✅ Passwordless auth |
 | **Enterprise agreements** | Pay-as-you-go | Azure commitment pricing |
 
-#### How to Use Azure AI Foundry
+#### Integration Status
 
-To use Azure AI Foundry instead of OpenRouter, you'll need to:
+We tested Azure AI Foundry integration and found:
 
-1. **Deploy a model in Azure AI Foundry:**
-   ```bash
-   # Create an Azure AI Foundry resource (if you don't have one)
-   az cognitiveservices account create \
-     --name my-ai-foundry \
-     --resource-group rg-moltbot-prod \
-     --kind OpenAI \
-     --sku S0 \
-     --location eastus2
-   
-   # Deploy a model (e.g., GPT-4o)
-   az cognitiveservices account deployment create \
-     --name my-ai-foundry \
-     --resource-group rg-moltbot-prod \
-     --deployment-name gpt-4o \
-     --model-name gpt-4o \
-     --model-version "2024-05-13" \
-     --model-format OpenAI
-   ```
+| Test | Result |
+|------|--------|
+| **Azure OpenAI API** | ✅ Works - Successfully called GPT-4.1 deployment |
+| **MoltBot Direct Integration** | ⚠️ Requires proxy - Azure uses different auth format |
 
-2. **Update MoltBot configuration:**
-   
-   MoltBot supports OpenAI-compatible APIs. Configure it to use your Azure AI Foundry endpoint:
-   ```bash
-   # Get your endpoint and key
-   ENDPOINT=$(az cognitiveservices account show \
-     --name my-ai-foundry \
-     --resource-group rg-moltbot-prod \
-     --query "properties.endpoint" -o tsv)
-   
-   API_KEY=$(az cognitiveservices account keys list \
-     --name my-ai-foundry \
-     --resource-group rg-moltbot-prod \
-     --query "key1" -o tsv)
-   
-   # Set environment variables for MoltBot
-   azd env set OPENAI_API_KEY "$API_KEY"
-   azd env set OPENAI_API_BASE "$ENDPOINT"
-   azd env set MOLTBOT_MODEL "azure/gpt-4o"
-   azd deploy
-   ```
+**The Challenge:** Azure OpenAI uses a different authentication pattern than standard OpenAI:
 
-3. **For Managed Identity (recommended):**
-   
-   Instead of using API keys, you can configure the Container App to authenticate using Managed Identity:
-   ```bash
-   # Grant the managed identity access to the AI Foundry resource
-   IDENTITY_PRINCIPAL_ID=$(az containerapp show --name moltbot \
-     --resource-group rg-moltbot-prod \
-     --query "identity.userAssignedIdentities.*.principalId" -o tsv)
-   
-   AI_RESOURCE_ID=$(az cognitiveservices account show \
-     --name my-ai-foundry \
-     --resource-group rg-moltbot-prod \
-     --query id -o tsv)
-   
-   az role assignment create \
-     --assignee $IDENTITY_PRINCIPAL_ID \
-     --role "Cognitive Services OpenAI User" \
-     --scope $AI_RESOURCE_ID
-   ```
+| Feature | Standard OpenAI | Azure OpenAI |
+|---------|-----------------|--------------|
+| Auth Header | `Authorization: Bearer xxx` | `api-key: xxx` |
+| API Version | Not required | Required (query param) |
+| Endpoint Format | `api.openai.com/v1/...` | `{resource}.openai.azure.com/...` |
 
-> **📝 Note:** The exact configuration for Azure AI Foundry depends on MoltBot's model provider implementation. Check the [MoltBot documentation](https://docs.molt.bot/concepts/model-providers) for the latest supported providers and configuration options. OpenRouter remains the simplest option for getting started quickly.
+#### How to Use Azure AI Foundry with MoltBot
+
+**Option A: Use LiteLLM as a Proxy (Recommended)**
+
+[LiteLLM](https://github.com/BerriAI/litellm) provides an OpenAI-compatible proxy that natively supports Azure OpenAI:
+
+```bash
+# 1. Deploy a model in Azure AI Foundry
+az cognitiveservices account create \
+  --name my-ai-foundry \
+  --resource-group rg-moltbot-prod \
+  --kind OpenAI \
+  --sku S0 \
+  --location eastus2
+
+az cognitiveservices account deployment create \
+  --name my-ai-foundry \
+  --resource-group rg-moltbot-prod \
+  --deployment-name gpt-4o \
+  --model-name gpt-4o \
+  --model-version "2024-05-13" \
+  --model-format OpenAI
+
+# 2. Get your Azure OpenAI credentials
+export AZURE_API_KEY=$(az cognitiveservices account keys list \
+  --name my-ai-foundry \
+  --resource-group rg-moltbot-prod \
+  --query "key1" -o tsv)
+export AZURE_API_BASE="https://my-ai-foundry.openai.azure.com"
+export AZURE_API_VERSION="2024-08-01-preview"
+
+# 3. Run LiteLLM proxy (add to your container or run as sidecar)
+pip install litellm
+litellm --model azure/gpt-4o --port 4000
+
+# 4. Configure MoltBot to use LiteLLM
+# In moltbot.json:
+# {
+#   "models": {
+#     "providers": {
+#       "azure-proxy": {
+#         "baseUrl": "http://localhost:4000/v1",
+#         "api": "openai-completions",
+#         "models": [{ "id": "gpt-4o", "name": "GPT-4o (Azure)" }]
+#       }
+#     }
+#   }
+# }
+```
+
+**Option B: Wait for Native MoltBot Support**
+
+MoltBot's model provider system is extensible. A future version may add native Azure OpenAI support with:
+- Automatic `api-key` header handling
+- Built-in `api-version` query parameter
+- Managed Identity authentication
+
+**Option C: Contribute to MoltBot**
+
+Azure OpenAI support could be added as a community contribution to MoltBot. The provider would need to:
+1. Use `api-key` header instead of `Authorization: Bearer`
+2. Add `api-version` query parameter to all requests
+3. Handle the different endpoint URL format
+
+> **💡 Recommendation:** For production deployments requiring Azure AI Foundry, use the LiteLLM proxy approach. For simpler setups, OpenRouter remains the easiest option with excellent model variety.
 
 ---
 

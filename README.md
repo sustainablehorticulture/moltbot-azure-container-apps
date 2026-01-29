@@ -393,16 +393,19 @@ This sample uses **OpenRouter** for simplicity, but you can also use **Azure AI 
 | Private networking | ❌ Public API | ✅ Private Endpoints |
 | Managed Identity | ❌ API key only | ✅ Passwordless auth |
 
-**To use Azure AI Foundry:**
+**Integration Status:** Azure AI Foundry works with MoltBot but requires a proxy like [LiteLLM](https://github.com/BerriAI/litellm) because Azure OpenAI uses a different auth format (`api-key` header instead of `Authorization: Bearer`).
 
-1. Deploy a model in Azure AI Foundry
-2. Configure MoltBot to use the OpenAI-compatible endpoint:
-   ```bash
-   azd env set OPENAI_API_KEY "<your-ai-foundry-key>"
-   azd env set OPENAI_API_BASE "<your-ai-foundry-endpoint>"
-   azd env set MOLTBOT_MODEL "azure/gpt-4o"
-   azd deploy
-   ```
+**Quick Setup with LiteLLM:**
+```bash
+# Run LiteLLM proxy for Azure OpenAI
+pip install litellm
+export AZURE_API_KEY="<your-key>"
+export AZURE_API_BASE="https://<resource>.openai.azure.com"
+litellm --model azure/<deployment-name> --port 4000
+
+# Configure MoltBot to use LiteLLM (in moltbot.json)
+# "models": { "providers": { "azure-proxy": { "baseUrl": "http://localhost:4000/v1" } } }
+```
 
 See the [blog post](./blog-post.md#-alternative-azure-ai-foundry) for detailed Azure AI Foundry configuration instructions.
 
