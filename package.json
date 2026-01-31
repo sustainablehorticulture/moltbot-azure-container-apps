@@ -1,0 +1,13 @@
+{
+  "name": "simple-discord-bot",
+  "version": "1.0.0",
+  "description": "Simple Discord bot for Azure Container Apps",
+  "main": "simple-bot.js",
+  "scripts": {
+    "start": "node simple-bot.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "axios": "^1.6.2"
+  }
+}

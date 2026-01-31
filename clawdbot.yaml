@@ -1,0 +1,12 @@
+properties:
+  template:
+    containers:
+      - name: clawdbot
+        image: cr6x5gbilut54j2.azurecr.io/moltbot:latest
+        command:
+          - node
+          - scripts/run-node.mjs
+          - gateway
+          - --port
+          - "18789"
+

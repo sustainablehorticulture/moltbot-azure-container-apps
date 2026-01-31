@@ -91,5 +91,9 @@ EOF
 echo "MoltBot configuration written to ${CONFIG_FILE}"
 echo "Gateway token configured: $([ -n "${MOLTBOT_GATEWAY_TOKEN}" ] && echo 'yes' || echo 'no')"
 
-# Start MoltBot Gateway with --allow-unconfigured to allow running without messaging channels
+# Disable TypeScript native compiler to avoid runtime compilation issues
+export TS_NATIVE=false
+
+# Start MoltBot gateway directly from built files
+cd /app
 exec node dist/index.js gateway --bind lan --port "${GATEWAY_PORT:-18789}" --allow-unconfigured "$@"
