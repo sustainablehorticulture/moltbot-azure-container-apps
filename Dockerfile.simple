@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN npm install
 
 # Copy bot code
-COPY simple-bot.js .
+COPY src/ ./src/
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs

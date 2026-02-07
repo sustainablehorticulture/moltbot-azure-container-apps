@@ -80,6 +80,12 @@ cat > "${CONFIG_FILE}" << EOF
       "token": "${MOLTBOT_GATEWAY_TOKEN}"
     }
   },
+  "database": {
+    "enabled": $([ -n "${DATABASE_CONNECTION_STRING}" ] && echo 'true' || echo 'false'),
+    "type": "${DATABASE_TYPE:-mssql}",
+    "connectionString": "${DATABASE_CONNECTION_STRING}",
+    "queryTimeout": 30000
+  },
   "logging": {
     "level": "info",
     "consoleLevel": "info",

@@ -1,13 +1,15 @@
 {
-  "name": "simple-discord-bot",
+  "name": "smart-discord-bot",
   "version": "1.0.0",
-  "description": "Simple Discord bot for Azure Container Apps",
-  "main": "simple-bot.js",
+  "description": "Smart Discord bot with database integration for Azure Container Apps",
+  "main": "src/moltbot/smart-bot.js",
   "scripts": {
-    "start": "node simple-bot.js"
+    "start": "node src/moltbot/smart-bot.js"
   },
   "dependencies": {
+    "axios": "^1.6.2",
     "discord.js": "^14.14.1",
-    "axios": "^1.6.2"
+    "mssql": "^9.1.1",
+    "smart-discord-bot": "file:"
   }
 }
