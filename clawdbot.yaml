@@ -2,7 +2,7 @@ properties:
   template:
     containers:
       - name: clawdbot
-        image: cr6x5gbilut54j2.azurecr.io/moltbot:latest
+        image: cr6x5gbilut54j2.azurecr.io/reddog:latest
         command:
           - node
           - scripts/run-node.mjs

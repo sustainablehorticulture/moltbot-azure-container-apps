@@ -1,11 +1,11 @@
 #!/bin/bash
-# MoltBot Azure Container Apps Entrypoint
+# Red Dog Azure Container Apps Entrypoint
 # Generates configuration from environment variables and starts the gateway
 
 set -e
 
-CONFIG_DIR="${HOME}/.moltbot"
-CONFIG_FILE="${CONFIG_DIR}/moltbot.json"
+CONFIG_DIR="${HOME}/.reddog"
+CONFIG_FILE="${CONFIG_DIR}/reddog.json"
 
 # Create config directory
 mkdir -p "${CONFIG_DIR}"
@@ -47,12 +47,12 @@ if [ -n "${DISCORD_CONFIG}" ]; then
   },'
 fi
 
-# Generate MoltBot configuration using current schema format
+# Generate Red Dog configuration using current schema format
 cat > "${CONFIG_FILE}" << EOF
 {
   "agents": {
     "defaults": {
-      "workspace": "${HOME}/molt",
+      "workspace": "${HOME}/reddog",
       "model": {
         "primary": "${MOLTBOT_MODEL:-openrouter/anthropic/claude-3.5-sonnet}"
       }
@@ -61,9 +61,9 @@ cat > "${CONFIG_FILE}" << EOF
       {
         "id": "main",
         "identity": {
-          "name": "${MOLTBOT_PERSONA_NAME:-Molt}",
+          "name": "${MOLTBOT_PERSONA_NAME:-Red Dog}",
           "theme": "helpful assistant",
-          "emoji": "🦞"
+          "emoji": "🐕"
         }
       }
     ]
@@ -94,12 +94,12 @@ cat > "${CONFIG_FILE}" << EOF
 }
 EOF
 
-echo "MoltBot configuration written to ${CONFIG_FILE}"
+echo "Red Dog configuration written to ${CONFIG_FILE}"
 echo "Gateway token configured: $([ -n "${MOLTBOT_GATEWAY_TOKEN}" ] && echo 'yes' || echo 'no')"
 
 # Disable TypeScript native compiler to avoid runtime compilation issues
 export TS_NATIVE=false
 
-# Start MoltBot gateway directly from built files
+# Start Red Dog gateway directly from built files
 cd /app
 exec node dist/index.js gateway --bind lan --port "${GATEWAY_PORT:-18789}" --allow-unconfigured "$@"

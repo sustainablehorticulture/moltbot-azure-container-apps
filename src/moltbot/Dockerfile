@@ -1,8 +1,8 @@
-# MoltBot on Azure Container Apps
-# This Dockerfile builds MoltBot from source with Azure-specific configurations
+# Red Dog on Azure Container Apps
+# This Dockerfile builds Red Dog from source with Azure-specific configurations
 # Based on https://docs.molt.bot/platforms/gcp
 
-# Use official MoltBot image
+# Use official Red Dog image
 FROM moltbot/moltbot:latest
 
 # Copy entrypoint script

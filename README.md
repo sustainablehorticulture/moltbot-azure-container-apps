@@ -1,12 +1,12 @@
-# 🦞 MoltBot on Azure Container Apps
+# 🐕 Red Dog on Azure Container Apps
 
 THIS IS THE BACKBONE STRUCTURE FOR THE AGENTS IN AZURE THIS 
 -COPY AND PASTE FPOR TREVOR AND DAISY
-Deploy your personal AI assistant to Azure Container Apps with Discord integration. This sample shows how to run [MoltBot](https://molt.bot) - an open-source personal AI assistant - on Azure's serverless container platform.
+Deploy your personal AI assistant to Azure Container Apps with Discord integration. This sample shows how to run [Red Dog](https://molt.bot) - an open-source personal AI assistant - on Azure's serverless container platform.
 
 ## What You'll Get
 
-- 🦞 **MoltBot AI Assistant** running on Azure Container Apps
+- 🐕 **Red Dog AI Assistant** running on Azure Container Apps
 - 💬 **Discord Integration** - Chat with your AI via Discord DMs
 - 🔐 **Secure by Default** - Gateway token authentication + DM allowlist
 - 📊 **Azure Monitoring** - Full observability via Log Analytics
@@ -21,7 +21,7 @@ Deploy your personal AI assistant to Azure Container Apps with Discord integrati
 │  │                  Azure Container Apps Environment                       ││
 │  │                                                                         ││
 │  │  ┌───────────────────────────────────────────────────────────────────┐  ││
-│  │  │                    MoltBot Container App                          │  ││
+│  │  │                    Red Dog Container App                          │  ││
 │  │  │                                                                    │  ││
 │  │  │  • Gateway (port 18789)          • Discord Bot Connection         │  ││
 │  │  │  • Control UI (web chat)         • OpenRouter API Integration     │  ││
@@ -32,7 +32,7 @@ Deploy your personal AI assistant to Azure Container Apps with Discord integrati
 │  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐ │
 │  │  Container Registry │  │   Managed Identity  │  │  Log Analytics     │ │
 │  │                     │  │                     │  │                     │ │
-│  │  Stores MoltBot    │  │  Secure ACR access  │  │  Logs & metrics    │ │
+│  │  Stores Red Dog    │  │  Secure ACR access  │  │  Logs & metrics    │ │
 │  │  container image    │  │  (no passwords!)    │  │  for monitoring    │ │
 │  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -48,14 +48,14 @@ Deploy your personal AI assistant to Azure Container Apps with Discord integrati
 
 ## One-Click Deployment with azd
 
-The fastest way to deploy MoltBot is using Azure Developer CLI (`azd`). This provisions all infrastructure, builds the container image, and deploys everything in one command.
+The fastest way to deploy Red Dog is using Azure Developer CLI (`azd`). This provisions all infrastructure, builds the container image, and deploys everything in one command.
 
 ### Step 1: Create Discord Bot (Do This First!)
 
 Before deploying, you need a Discord bot token:
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click **New Application** → Name it (e.g., "MoltBot-Azure")
+2. Click **New Application** → Name it (e.g., "RedDog-Azure")
 3. Go to **Bot** → Click **Add Bot** (or **Reset Token** if exists)
 4. Enable these **Privileged Gateway Intents**:
    - ✅ Message Content Intent
@@ -85,7 +85,7 @@ azd provision
 ```
 
 When prompted, enter:
-- **Environment name**: e.g., `MoltBot-prod`
+- **Environment name**: e.g., `RedDog-prod`
 - **Azure subscription**: Select your subscription
 - **Location**: e.g., `eastus2`
 
@@ -95,7 +95,7 @@ When prompted, enter:
 
 ```bash
 # Get your ACR name
-ACR_NAME=$(az acr list --resource-group rg-MoltBot-prod --query "[0].name" -o tsv)
+ACR_NAME=$(az acr list --resource-group rg-RedDog-prod --query "[0].name" -o tsv)
 
 # Build the image in Azure (no local Docker needed!)
 az acr build --registry $ACR_NAME --image "MoltBot:latest" --file src/MoltBot/Dockerfile src/MoltBot/
