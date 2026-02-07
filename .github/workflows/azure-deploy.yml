@@ -1,0 +1,41 @@
+name: Deploy Red Dog to Azure Container Apps
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: cr5eqmkn3bypkyu.azurecr.io
+  IMAGE_NAME: reddog
+  RESOURCE_GROUP: BotRedDog
+  CONTAINER_APP_NAME: clawdbot
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        
+    - name: Build and push container image
+      run: |
+        az acr build --registry ${{ env.REGISTRY }} --image ${{ env.IMAGE_NAME }}:latest --file src/moltbot/Dockerfile src/moltbot/
+        
+    - name: Deploy to Azure Container Apps
+      run: |
+        az containerapp update \
+          --name ${{ env.CONTAINER_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
