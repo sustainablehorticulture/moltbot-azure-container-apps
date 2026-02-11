@@ -60,10 +60,14 @@ class AIEngine {
             for (const dbName of Object.keys(this.db.pools)) {
                 schemaLines.push(`\n## Database: ${dbName}`);
                 const tables = await this.db.getTables(dbName);
-                for (const table of tables) {
-                    const cols = await this.db.getTableSchema(table.TABLE_NAME, dbName);
-                    const colList = cols.map(c => `${c.COLUMN_NAME} (${c.DATA_TYPE})`).join(', ');
-                    schemaLines.push(`- ${table.TABLE_NAME}: ${colList}`);
+                if (tables.length === 0) {
+                    schemaLines.push(`(This database has NO tables and NO data. Do not query it.)`);
+                } else {
+                    for (const table of tables) {
+                        const cols = await this.db.getTableSchema(table.TABLE_NAME, dbName);
+                        const colList = cols.map(c => `${c.COLUMN_NAME} (${c.DATA_TYPE})`).join(', ');
+                        schemaLines.push(`- ${table.TABLE_NAME}: ${colList}`);
+                    }
                 }
             }
             this.schemaCache = schemaLines.join('\n');
@@ -89,6 +93,8 @@ Rules for SQL queries:
 - Always specify which database to query using the "database" field
 - Use TOP 50 to limit large result sets
 - Be precise with column names based on the schema below
+- IMPORTANT: Only query the specific database the user asks about. If a database has no tables, tell the user honestly — do NOT pull data from a different database instead.
+- If a database is marked as having no tables, do NOT generate a query for it. Just explain that the database is empty.
 
 If the question does NOT need a database query, just respond normally in plain text with your Red Dog personality.
 
