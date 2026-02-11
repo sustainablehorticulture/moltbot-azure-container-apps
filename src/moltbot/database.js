@@ -24,38 +24,49 @@ class DatabaseManager {
             options: {
                 encrypt: (parts['encrypt'] || 'true').toLowerCase() === 'true',
                 trustServerCertificate: (parts['trustservercertificate'] || 'false').toLowerCase() === 'true',
-                requestTimeout: 30000
-            }
+                requestTimeout: 30000,
+                connectTimeout: 30000
+            },
+            connectionTimeout: 30000
         };
     }
 
-    async connect() {
+    async connect(retries = 3) {
         if (!this.config.enabled) {
             console.log('Database disabled in configuration');
             return false;
         }
 
-        try {
-            this.serverConfig = this.parseConnectionString(this.config.connectionString);
+        this.serverConfig = this.parseConnectionString(this.config.connectionString);
+        const dbNames = this.config.databases || [];
 
-            // Connect to each configured database
-            const dbNames = this.config.databases || [];
-            for (const dbName of dbNames) {
-                await this.connectToDatabase(dbName);
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                for (const dbName of dbNames) {
+                    if (!this.pools[dbName]) {
+                        await this.connectToDatabase(dbName);
+                    }
+                }
+
+                if (dbNames.length > 0 && !this.activeDb) {
+                    this.activeDb = dbNames[0];
+                }
+
+                this.isConnected = Object.keys(this.pools).length > 0;
+                console.log(`Database manager connected to ${Object.keys(this.pools).length} database(s): ${Object.keys(this.pools).join(', ')}`);
+                return this.isConnected;
+            } catch (error) {
+                console.error(`Database connection attempt ${attempt}/${retries} failed: ${error.message}`);
+                if (attempt < retries) {
+                    const delay = attempt * 5000;
+                    console.log(`Retrying in ${delay / 1000}s...`);
+                    await new Promise(r => setTimeout(r, delay));
+                }
             }
-
-            // Set the first database as active by default
-            if (dbNames.length > 0) {
-                this.activeDb = dbNames[0];
-            }
-
-            this.isConnected = Object.keys(this.pools).length > 0;
-            console.log(`Database manager connected to ${Object.keys(this.pools).length} database(s): ${Object.keys(this.pools).join(', ')}`);
-            return this.isConnected;
-        } catch (error) {
-            console.error('Database connection failed:', error.message);
-            return false;
         }
+
+        console.error('Database connection failed after all retries');
+        return false;
     }
 
     async connectToDatabase(dbName) {

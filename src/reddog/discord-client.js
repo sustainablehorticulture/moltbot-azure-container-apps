@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, ChannelType } = require('discord.js');
 
 class DiscordClient {
     constructor(aiEngine) {
@@ -9,7 +9,8 @@ class DiscordClient {
                 GatewayIntentBits.GuildMessages,
                 GatewayIntentBits.MessageContent,
                 GatewayIntentBits.DirectMessages
-            ]
+            ],
+            partials: [Partials.Channel, Partials.Message]
         });
         this.setupEventHandlers();
     }
@@ -37,8 +38,17 @@ class DiscordClient {
             return;
         }
 
-        // Only respond to DMs
-        if (message.channel.type !== 1) return;
+        // Respond to DMs or server messages that mention the bot
+        const isDM = message.channel.type === ChannelType.DM;
+        const isMentioned = message.mentions.has(this.client.user);
+        if (!isDM && !isMentioned) return;
+
+        // Strip the bot mention from the message content
+        let content = message.content;
+        if (isMentioned) {
+            content = content.replace(/<@!?\d+>/g, '').trim();
+            if (!content) return;
+        }
 
         try {
             console.log(`Discord: Message from ${message.author.username}: ${message.content}`);
@@ -46,7 +56,7 @@ class DiscordClient {
             // Show typing indicator while processing
             await message.channel.sendTyping();
 
-            const result = await this.aiEngine.chat(message.content);
+            const result = await this.aiEngine.chat(content);
 
             // Discord has a 2000 char limit — split if needed
             const reply = result.reply;
