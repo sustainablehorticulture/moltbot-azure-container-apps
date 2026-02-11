@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const axios = require('axios');
 const DatabaseManager = require('./database');
@@ -16,6 +17,7 @@ class SmartBot {
         this.db = new DatabaseManager({
             enabled: process.env.DATABASE_ENABLED === 'true',
             connectionString: process.env.DATABASE_CONNECTION_STRING,
+            databases: process.env.DATABASE_NAMES ? process.env.DATABASE_NAMES.split(',').map(s => s.trim()) : [],
             type: process.env.DATABASE_TYPE || 'mssql'
         });
 
@@ -87,10 +89,12 @@ class SmartBot {
 
     isDatabaseQuery(content) {
         const dbKeywords = [
-            'show tables', 'list tables', 'get tables',
+            'show tables', 'list tables', 'get tables', 'show all tables',
             'table schema', 'describe table', 'table structure',
             'search database', 'find in database', 'query database',
-            'execute query', 'run query', 'sql query'
+            'search all databases', 'search all',
+            'execute query', 'run query', 'sql query',
+            'use database', 'switch database', 'list databases', 'show databases'
         ];
         
         return dbKeywords.some(keyword => content.includes(keyword));
@@ -104,9 +108,30 @@ class SmartBot {
         const lowerContent = content.toLowerCase();
 
         try {
+            // Database management commands
+            if (lowerContent.includes('list databases') || lowerContent.includes('show databases')) {
+                const dbs = this.db.listConnectedDatabases();
+                const dbList = dbs.map(d => `${d.active ? '> ' : '  '}${d.name}${d.active ? ' (active)' : ''}`).join('\n');
+                return `Connected databases:\n${dbList}\n\nUse "use database [name]" to switch.`;
+            }
+
+            if (lowerContent.includes('use database') || lowerContent.includes('switch database')) {
+                const dbName = this.extractDatabaseName(content);
+                if (!dbName) {
+                    return "Please specify a database name. Example: 'use database MyDB'";
+                }
+                return this.db.useDatabase(dbName);
+            }
+
+            // Show tables across all databases
+            if (lowerContent.includes('show all tables')) {
+                const allTables = await this.db.getTablesAllDatabases();
+                return this.formatAllTablesResponse(allTables);
+            }
+
             if (lowerContent.includes('show tables') || lowerContent.includes('list tables') || lowerContent.includes('get tables')) {
                 const tables = await this.db.getTables();
-                return this.formatTablesResponse(tables);
+                return this.formatTablesResponse(tables, this.db.activeDb);
             }
 
             if (lowerContent.includes('table schema') || lowerContent.includes('describe table') || lowerContent.includes('table structure')) {
@@ -116,6 +141,16 @@ class SmartBot {
                 }
                 const schema = await this.db.getTableSchema(tableName);
                 return this.formatSchemaResponse(tableName, schema);
+            }
+
+            // Search across all databases
+            if (lowerContent.includes('search all databases') || lowerContent.includes('search all')) {
+                const searchTerm = this.extractSearchTerm(content);
+                if (!searchTerm) {
+                    return "Please specify a search term. Example: 'search all databases for user'";
+                }
+                const allResults = await this.db.searchAllDatabases(searchTerm);
+                return this.formatAllSearchResponse(searchTerm, allResults);
             }
 
             if (lowerContent.includes('search database') || lowerContent.includes('find in database')) {
@@ -132,7 +167,7 @@ class SmartBot {
                 return await this.handleCustomQuery(content);
             }
 
-            return "I'm not sure what database operation you want. Try: 'show tables', 'describe table [name]', or 'search database for [term]'";
+            return "I'm not sure what database operation you want. Try: 'list databases', 'use database [name]', 'show tables', 'show all tables', 'describe table [name]', 'search database for [term]', or 'search all databases for [term]'";
 
         } catch (error) {
             console.error('Database query error:', error);
@@ -174,18 +209,38 @@ class SmartBot {
         return match ? match[1] : null;
     }
 
+    extractDatabaseName(content) {
+        const match = content.match(/(?:use|switch)\s+database\s+(\S+)/i);
+        return match ? match[1] : null;
+    }
+
     extractSearchTerm(content) {
         const match = content.match(/(?:search|find)\s+(?:database\s+)?(?:for\s+)?(.+?)(?:\s|$)/i);
         return match ? match[1] : null;
     }
 
-    formatTablesResponse(tables) {
+    formatTablesResponse(tables, dbName = null) {
         if (tables.length === 0) {
             return "No tables found in the database.";
         }
 
+        const header = dbName ? `Tables in '${dbName}'` : 'Tables';
         const tableList = tables.map(t => `• ${t.TABLE_NAME}`).join('\n');
-        return `Found ${tables.length} tables:\n${tableList}`;
+        return `${header} (${tables.length}):\n${tableList}`;
+    }
+
+    formatAllTablesResponse(allTables) {
+        const sections = Object.entries(allTables).map(([dbName, tables]) => {
+            if (tables.error) {
+                return `**${dbName}**: Error - ${tables.error}`;
+            }
+            if (tables.length === 0) {
+                return `**${dbName}**: No tables found`;
+            }
+            const tableList = tables.map(t => `  • ${t.TABLE_NAME}`).join('\n');
+            return `**${dbName}** (${tables.length} tables):\n${tableList}`;
+        });
+        return sections.join('\n\n');
     }
 
     formatSchemaResponse(tableName, schema) {
@@ -218,6 +273,27 @@ class SmartBot {
             .join('\n');
 
         return `Found matches for '${searchTerm}':\n${response}`;
+    }
+
+    formatAllSearchResponse(searchTerm, allResults) {
+        const sections = Object.entries(allResults).map(([dbName, results]) => {
+            if (results.error) {
+                return `**${dbName}**: Error - ${results.error}`;
+            }
+            if (results.length === 0) {
+                return `**${dbName}**: No matches`;
+            }
+            const grouped = {};
+            results.forEach(row => {
+                if (!grouped[row.TABLE_NAME]) grouped[row.TABLE_NAME] = [];
+                grouped[row.TABLE_NAME].push(row.COLUMN_NAME);
+            });
+            const lines = Object.entries(grouped)
+                .map(([table, columns]) => `  • ${table}: ${columns.join(', ')}`)
+                .join('\n');
+            return `**${dbName}**:\n${lines}`;
+        });
+        return `Search results for '${searchTerm}' across all databases:\n\n${sections.join('\n\n')}`;
     }
 
     formatQueryResults(results) {
