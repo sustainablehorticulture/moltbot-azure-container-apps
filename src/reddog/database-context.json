@@ -1,0 +1,35 @@
+{
+  "overview": "Zerosum Agriculture manages multiple farm properties. The 'zerosumag' database is the MASTER database containing all operational data across all farms — paddocks, crops, sites, soil, energy, water, projects, and more. Individual farm databases (like 'Grassgum Farm') only contain IoT sensor data specific to that property.",
+  "databases": {
+    "zerosumag": {
+      "role": "Master database",
+      "description": "Contains ALL farm management data for every property. This is where paddock info, crop data, site overviews, soil data, project details, energy records, water data, and business records live. When a user asks about any farm's paddocks, crops, production, sites, or operational data — query THIS database.",
+      "keyTables": {
+        "Soil_Paddocks": "Paddock details for all farms. Use the 'Farm' column to filter by property (e.g. WHERE Farm = 'Grassgum Farm'). Contains paddock names, areas, products grown, tree spacing, water use, etc.",
+        "Site Overview": "Overview of all farm sites/properties. Contains location, area, crops grown, energy systems, water schemes, and contact info.",
+        "Site_Overview": "Alternative site overview table with similar data plus project IDs and Hort360 integration.",
+        "Project_Site_Overview": "Detailed project and site data including capital costs, solar/battery systems, circuits, and production info.",
+        "site_reporting": "Reporting data by category, type, and site name."
+      },
+      "farmLinkColumns": ["Farm", "Name", "Identifier", "Project"]
+    },
+    "Grassgum Farm": {
+      "role": "IoT sensor database",
+      "description": "Contains ONLY IoT sensor data for Grassgum Farm property. Currently has weather station readings (temperature, humidity, wind, rain, battery levels). For paddock, crop, or operational data about Grassgum Farm, query the 'zerosumag' database instead and filter by Farm = 'Grassgum Farm'.",
+      "keyTables": {
+        "Weather_Station": "Weather station sensor readings — temperature, humidity, wind speed/direction, rain gauge, battery level. Time-series data with timestamps."
+      }
+    },
+    "Pairtree": {
+      "role": "Empty database",
+      "description": "Currently has no tables or data. This database is set up but not yet populated."
+    }
+  },
+  "queryGuidance": [
+    "When a user asks about paddocks, crops, what's being grown, or farm operations at ANY farm — always query the 'zerosumag' database and filter by the farm name.",
+    "When a user asks about weather, temperature, rain, wind, or sensor data at Grassgum Farm — query the 'Grassgum Farm' database.",
+    "The 'Farm' column in Soil_Paddocks and the 'Name' column in Site Overview link to individual farm names like 'Grassgum Farm'.",
+    "If a question spans both operational data AND sensor data, you may need to explain that the data comes from different databases and provide results from each.",
+    "Farm names in the database: 'Grassgum Farm', 'Zerosum Agriculture'."
+  ]
+}

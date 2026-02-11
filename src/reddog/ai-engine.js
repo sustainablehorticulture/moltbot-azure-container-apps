@@ -11,6 +11,20 @@ class AIEngine {
         this.conversations = new Map(); // userId -> message history
         this.maxHistory = parseInt(process.env.CONVERSATION_HISTORY_LENGTH) || 20;
         this.persona = this.loadPersona();
+        this.dbContext = this.loadDatabaseContext();
+    }
+
+    loadDatabaseContext() {
+        try {
+            const ctxPath = path.join(__dirname, 'database-context.json');
+            const raw = fs.readFileSync(ctxPath, 'utf-8');
+            const ctx = JSON.parse(raw);
+            console.log('Database context loaded');
+            return ctx;
+        } catch (error) {
+            console.error('Failed to load database context:', error.message);
+            return null;
+        }
     }
 
     loadPersona() {
@@ -93,12 +107,30 @@ Rules for SQL queries:
 - Always specify which database to query using the "database" field
 - Use TOP 50 to limit large result sets
 - Be precise with column names based on the schema below
-- IMPORTANT: Only query the specific database the user asks about. If a database has no tables, tell the user honestly — do NOT pull data from a different database instead.
 - If a database is marked as having no tables, do NOT generate a query for it. Just explain that the database is empty.
 
-If the question does NOT need a database query, just respond normally in plain text with your Red Dog personality.
+If the question does NOT need a database query, just respond normally in plain text with your Red Dog personality.`;
 
-Available database schema:`;
+        // Add database relationship context
+        if (this.dbContext) {
+            prompt += `\n\n=== DATABASE RELATIONSHIPS ===\n${this.dbContext.overview}\n`;
+            for (const [dbName, info] of Object.entries(this.dbContext.databases)) {
+                prompt += `\n**${dbName}** (${info.role}): ${info.description}`;
+                if (info.keyTables) {
+                    for (const [table, desc] of Object.entries(info.keyTables)) {
+                        prompt += `\n  - ${table}: ${desc}`;
+                    }
+                }
+            }
+            if (this.dbContext.queryGuidance) {
+                prompt += `\n\n=== QUERY GUIDANCE ===`;
+                for (const guidance of this.dbContext.queryGuidance) {
+                    prompt += `\n- ${guidance}`;
+                }
+            }
+        }
+
+        prompt += `\n\n=== FULL DATABASE SCHEMA ===`;
 
         if (this.schemaCache) {
             prompt += `\n${this.schemaCache}`;
