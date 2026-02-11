@@ -8,7 +8,7 @@
         "Soil_Paddocks": "Paddock details for all farms. Use the 'Farm' column to filter by property (e.g. WHERE Farm = 'Grassgum Farm'). Contains paddock names, areas, products grown, tree spacing, water use, etc.",
         "Site Overview": "Overview of all farm sites/properties. Contains location, area, crops grown, energy systems, water schemes, and contact info.",
         "Site_Overview": "Alternative site overview table with similar data plus project IDs and Hort360 integration.",
-        "Project_Site_Overview": "Detailed project and site data including capital costs, solar/battery systems, circuits, and production info.",
+        "Project_Site_Overview": "Detailed project and site data overview including capital costs, solar/battery systems, circuits, and production info.",
         "site_reporting": "Reporting data by category, type, and site name."
       },
       "farmLinkColumns": ["Farm", "Name", "Identifier", "Project"]
