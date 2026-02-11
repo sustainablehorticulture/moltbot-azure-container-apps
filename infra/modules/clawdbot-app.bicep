@@ -61,6 +61,19 @@ param clawdbotPersonaName string = 'Clawd'
 @description('ClawdBot Model - must use exact OpenRouter model ID')
 param clawdbotModel string = 'openrouter/anthropic/claude-3.5-sonnet'
 
+@description('Database connection string for Azure SQL')
+@secure()
+param databaseConnectionString string = ''
+
+@description('Comma-separated list of database names')
+param databaseNames string = ''
+
+@description('Enable database integration')
+param databaseEnabled string = 'false'
+
+@description('OpenRouter model for Red Dog AI engine')
+param openRouterModel string = 'openai/gpt-4o-mini'
+
 @description('Container CPU cores')
 param containerCpu string = '1.0'
 
@@ -190,6 +203,10 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'storage-connection-string'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
         }
+        {
+          name: 'database-connection-string'
+          value: !empty(databaseConnectionString) ? databaseConnectionString : 'not-set'
+        }
       ]
     }
     template: {
@@ -254,6 +271,26 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'NODE_ENV'
               value: 'production'
+            }
+            {
+              name: 'DATABASE_ENABLED'
+              value: databaseEnabled
+            }
+            {
+              name: 'DATABASE_CONNECTION_STRING'
+              secretRef: 'database-connection-string'
+            }
+            {
+              name: 'DATABASE_NAMES'
+              value: databaseNames
+            }
+            {
+              name: 'OPENROUTER_MODEL'
+              value: openRouterModel
+            }
+            {
+              name: 'API_PORT'
+              value: '18789'
             }
           ]
           volumeMounts: [

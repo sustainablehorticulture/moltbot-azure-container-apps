@@ -49,6 +49,18 @@
     },
     "alertEmailAddress": {
       "value": "${ALERT_EMAIL_ADDRESS}"
+    },
+    "databaseConnectionString": {
+      "value": "${DATABASE_CONNECTION_STRING}"
+    },
+    "databaseNames": {
+      "value": "${DATABASE_NAMES}"
+    },
+    "databaseEnabled": {
+      "value": "${DATABASE_ENABLED=false}"
+    },
+    "openRouterModel": {
+      "value": "${OPENROUTER_MODEL=openai/gpt-4o-mini}"
     }
   }
 }

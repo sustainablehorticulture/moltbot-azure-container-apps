@@ -1,4 +1,4 @@
-targetScope = 'subscription'
+targetScope = 'resourceGroup'
 
 @minLength(1)
 @maxLength(64)
@@ -8,6 +8,9 @@ param environmentName string
 @minLength(1)
 @description('Primary location for all resources')
 param location string
+
+@description('Name of existing resource group to use (leave empty to create new one)')
+param existingResourceGroupName string = ''
 
 @description('Anthropic API key for Claude models (optional if using OpenRouter)')
 @secure()
@@ -69,6 +72,19 @@ param allowedIpRanges string = ''
 @description('Enable internal-only ingress (requires VNet-integrated environment)')
 param internalOnly bool = false
 
+@description('Database connection string for Azure SQL')
+@secure()
+param databaseConnectionString string = ''
+
+@description('Comma-separated list of database names')
+param databaseNames string = ''
+
+@description('Enable database integration')
+param databaseEnabled string = 'false'
+
+@description('OpenRouter model for Red Dog AI engine')
+param openRouterModel string = 'openai/gpt-4o-mini'
+
 @description('Enable security and availability alerts')
 param enableAlerts bool = true
 
@@ -77,20 +93,12 @@ param alertEmailAddress string = ''
 
 // Generate unique suffix for resources
 var abbrs = loadJsonContent('./abbreviations.json')
-var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
+var resourceToken = toLower(uniqueString(resourceGroup().id, environmentName, location))
 var tags = { 'azd-env-name': environmentName }
-
-// Resource Group
-resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
-  name: '${abbrs.resourcesResourceGroups}${environmentName}'
-  location: location
-  tags: tags
-}
 
 // Log Analytics Workspace for monitoring
 module logAnalytics './modules/log-analytics.bicep' = {
   name: 'log-analytics'
-  scope: rg
   params: {
     name: '${abbrs.operationalInsightsWorkspaces}${resourceToken}'
     location: location
@@ -101,7 +109,6 @@ module logAnalytics './modules/log-analytics.bicep' = {
 // Azure Container Registry for images
 module containerRegistry './modules/container-registry.bicep' = {
   name: 'container-registry'
-  scope: rg
   params: {
     name: '${abbrs.containerRegistryRegistries}${resourceToken}'
     location: location
@@ -112,7 +119,6 @@ module containerRegistry './modules/container-registry.bicep' = {
 // Storage Account for ClawdBot persistent data
 module storageAccount './modules/storage-account.bicep' = {
   name: 'storage-account'
-  scope: rg
   params: {
     name: '${abbrs.storageStorageAccounts}${resourceToken}'
     location: location
@@ -123,7 +129,6 @@ module storageAccount './modules/storage-account.bicep' = {
 // Container Apps Environment
 module containerAppsEnvironment './modules/container-apps-env.bicep' = {
   name: 'container-apps-env'
-  scope: rg
   params: {
     name: '${abbrs.appContainerAppsEnvironments}${resourceToken}'
     location: location
@@ -136,7 +141,6 @@ module containerAppsEnvironment './modules/container-apps-env.bicep' = {
 // ClawdBot Container App
 module clawdbotApp './modules/clawdbot-app.bicep' = {
   name: 'clawdbot-app'
-  scope: rg
   params: {
     name: 'clawdbot'
     location: location
@@ -157,6 +161,10 @@ module clawdbotApp './modules/clawdbot-app.bicep' = {
     clawdbotGatewayToken: clawdbotGatewayToken
     clawdbotPersonaName: clawdbotPersonaName
     clawdbotModel: clawdbotModel
+    databaseConnectionString: databaseConnectionString
+    databaseNames: databaseNames
+    databaseEnabled: databaseEnabled
+    openRouterModel: openRouterModel
     containerCpu: containerCpu
     containerMemory: containerMemory
     minReplicas: minReplicas
@@ -169,7 +177,6 @@ module clawdbotApp './modules/clawdbot-app.bicep' = {
 // Security and availability alerts
 module alerts './modules/alerts.bicep' = if (enableAlerts) {
   name: 'alerts'
-  scope: rg
   params: {
     namePrefix: 'clawdbot'
     location: location
@@ -188,7 +195,7 @@ module alerts './modules/alerts.bicep' = if (enableAlerts) {
 output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = subscription().tenantId
 output AZURE_SUBSCRIPTION_ID string = subscription().subscriptionId
-output AZURE_RESOURCE_GROUP string = rg.name
+output AZURE_RESOURCE_GROUP string = resourceGroup().name
 
 output CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
 output CONTAINER_REGISTRY_LOGIN_SERVER string = containerRegistry.outputs.loginServer

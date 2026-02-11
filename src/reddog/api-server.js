@@ -6,7 +6,7 @@ class APIServer {
         this.aiEngine = aiEngine;
         this.db = db;
         this.app = express();
-        this.port = process.env.API_PORT || 3001;
+        this.port = process.env.API_PORT || process.env.GATEWAY_PORT || 3001;
         this.setupMiddleware();
         this.setupRoutes();
     }
