@@ -56,7 +56,7 @@ class DiscordClient {
             // Show typing indicator while processing
             await message.channel.sendTyping();
 
-            const result = await this.aiEngine.chat(content);
+            const result = await this.aiEngine.chat(content, message.author.id);
 
             // Discord has a 2000 char limit — split if needed
             const reply = result.reply;

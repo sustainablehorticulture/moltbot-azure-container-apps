@@ -29,11 +29,11 @@ class APIServer {
         // Chat endpoint — send a message, get an AI response (with optional DB queries)
         this.app.post('/api/chat', async (req, res) => {
             try {
-                const { message, history } = req.body;
+                const { message, userId } = req.body;
                 if (!message) {
                     return res.status(400).json({ error: 'message is required' });
                 }
-                const result = await this.aiEngine.chat(message, history || []);
+                const result = await this.aiEngine.chat(message, userId || req.ip);
                 res.json(result);
             } catch (error) {
                 console.error('Chat API error:', error.message);

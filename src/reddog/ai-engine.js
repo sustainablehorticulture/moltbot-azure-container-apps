@@ -1,4 +1,6 @@
 const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
 
 class AIEngine {
     constructor(db) {
@@ -6,6 +8,49 @@ class AIEngine {
         this.schemaCache = null;
         this.model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
         this.apiKey = process.env.OPENROUTER_API_KEY;
+        this.conversations = new Map(); // userId -> message history
+        this.maxHistory = parseInt(process.env.CONVERSATION_HISTORY_LENGTH) || 20;
+        this.persona = this.loadPersona();
+    }
+
+    loadPersona() {
+        try {
+            const personaPath = path.join(__dirname, 'persona.json');
+            const raw = fs.readFileSync(personaPath, 'utf-8');
+            const persona = JSON.parse(raw);
+            console.log(`Persona loaded: ${persona.name}`);
+            return persona;
+        } catch (error) {
+            console.error('Failed to load persona, using defaults:', error.message);
+            return {
+                name: 'Red Dog',
+                personality: 'You are Red Dog, a helpful farm data assistant for Zerosum Ag.',
+                summaryStyle: 'Summarise database results clearly and concisely.',
+                errorMessage: 'Sorry, something went wrong. Please try again.',
+                noDataMessage: 'No results found.',
+                unsafeQueryMessage: 'I can only run SELECT queries for safety reasons.'
+            };
+        }
+    }
+
+    getHistory(userId) {
+        if (!this.conversations.has(userId)) {
+            this.conversations.set(userId, []);
+        }
+        return this.conversations.get(userId);
+    }
+
+    addToHistory(userId, role, content) {
+        const history = this.getHistory(userId);
+        history.push({ role, content });
+        // Keep only the last N messages
+        while (history.length > this.maxHistory) {
+            history.shift();
+        }
+    }
+
+    clearHistory(userId) {
+        this.conversations.delete(userId);
     }
 
     async cacheSchema() {
@@ -34,7 +79,7 @@ class AIEngine {
     }
 
     buildSystemPrompt() {
-        let prompt = `You are Red Dog, a helpful farm data assistant for Zerosum Ag. You have direct access to SQL Server databases and can query them to answer questions.
+        let prompt = `${this.persona.personality}
 
 When the user asks a question that needs data, respond with a JSON block containing the SQL query to run:
 {"action": "query", "database": "database_name", "sql": "SELECT ..."}
@@ -45,7 +90,7 @@ Rules for SQL queries:
 - Use TOP 50 to limit large result sets
 - Be precise with column names based on the schema below
 
-If the question does NOT need a database query, just respond normally in plain text.
+If the question does NOT need a database query, just respond normally in plain text with your Red Dog personality.
 
 Available database schema:`;
 
@@ -64,13 +109,20 @@ Available database schema:`;
         return unsafeKeywords.some(keyword => lowerSql.includes(keyword));
     }
 
-    async chat(userMessage, conversationHistory = []) {
+    async chat(userMessage, userId = 'default') {
         try {
+            // Handle special commands
+            if (userMessage.toLowerCase().trim() === 'clear' || userMessage.toLowerCase().trim() === 'reset') {
+                this.clearHistory(userId);
+                return { reply: "No worries, mate — slate's clean! What's next?" };
+            }
+
             const systemPrompt = this.buildSystemPrompt();
+            const history = this.getHistory(userId);
 
             const messages = [
                 { role: 'system', content: systemPrompt },
-                ...conversationHistory,
+                ...history,
                 { role: 'user', content: userMessage }
             ];
 
@@ -94,8 +146,11 @@ Available database schema:`;
                     const queryPlan = JSON.parse(queryMatch[0]);
 
                     if (this.isUnsafeQuery(queryPlan.sql)) {
+                        const reply = this.persona.unsafeQueryMessage;
+                        this.addToHistory(userId, 'user', userMessage);
+                        this.addToHistory(userId, 'assistant', reply);
                         return {
-                            reply: 'I can only run SELECT queries for safety reasons.',
+                            reply,
                             query: queryPlan.sql,
                             database: queryPlan.database,
                             error: 'unsafe_query'
@@ -113,7 +168,7 @@ Available database schema:`;
                     const summaryResponse = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
                         model: this.model,
                         messages: [
-                            { role: 'system', content: 'You are Red Dog, a helpful farm data assistant. Summarise the following database query results in a clear, conversational way. Use bullet points or tables where appropriate. Keep it concise.' },
+                            { role: 'system', content: this.persona.summaryStyle },
                             { role: 'user', content: userMessage },
                             { role: 'assistant', content: `I ran this query: ${queryPlan.sql}` },
                             { role: 'user', content: `Here are the results:\n${resultText}\n\nPlease summarise these results for me.` }
@@ -125,8 +180,12 @@ Available database schema:`;
                         }
                     });
 
+                    const summaryReply = summaryResponse.data.choices[0].message.content;
+                    this.addToHistory(userId, 'user', userMessage);
+                    this.addToHistory(userId, 'assistant', summaryReply);
+
                     return {
-                        reply: summaryResponse.data.choices[0].message.content,
+                        reply: summaryReply,
                         query: queryPlan.sql,
                         database: queryPlan.database,
                         rowCount: results.length,
@@ -134,19 +193,24 @@ Available database schema:`;
                     };
                 } catch (queryError) {
                     console.error('AI-driven query failed:', queryError.message);
+                    const errReply = `Bit of a hiccup fetching that data, mate: ${queryError.message}`;
+                    this.addToHistory(userId, 'user', userMessage);
+                    this.addToHistory(userId, 'assistant', errReply);
                     return {
-                        reply: `I tried to query the database but got an error: ${queryError.message}`,
+                        reply: errReply,
                         error: queryError.message
                     };
                 }
             }
 
             // No query needed — return the AI's direct response
+            this.addToHistory(userId, 'user', userMessage);
+            this.addToHistory(userId, 'assistant', aiReply);
             return { reply: aiReply };
         } catch (error) {
             console.error('AI response error:', error.message);
             return {
-                reply: 'Sorry, I encountered an error getting an AI response.',
+                reply: this.persona.errorMessage,
                 error: error.message
             };
         }
