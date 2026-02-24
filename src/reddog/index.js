@@ -3,6 +3,7 @@ const DatabaseManager = require('../moltbot/database');
 const AIEngine = require('./ai-engine');
 const APIServer = require('./api-server');
 const DiscordClient = require('./discord-client');
+const BillingSystem = require('./billing-system');
 
 async function main() {
     console.log('=== Red Dog Starting ===');
@@ -22,20 +23,24 @@ async function main() {
     }
     console.log('Database:', db.isConnected ? `Connected (${Object.keys(db.pools).join(', ')})` : 'Disabled');
 
-    // 2. Initialize AI engine with database context
+    // 2. Initialize billing system
+    console.log('Initializing billing system...');
+    const billing = new BillingSystem({ db });
+
+    // 3. Initialize AI engine with database context and billing
     console.log('Initializing AI engine...');
-    const ai = new AIEngine(db);
+    const ai = new AIEngine(db, billing);
     if (db.isConnected) {
         console.log('Caching database schema (this may take a moment)...');
         await ai.cacheSchema();
     }
 
-    // 3. Start API server
+    // 4. Start API server
     console.log('Starting API server...');
     const api = new APIServer(ai, db);
     await api.start();
 
-    // 4. Start Discord client (optional — runs alongside API)
+    // 5. Start Discord client (optional — runs alongside API)
     console.log('Starting Discord client...');
     const discord = new DiscordClient(ai);
     await discord.start();
@@ -44,6 +49,7 @@ async function main() {
     console.log(`API:     http://localhost:${process.env.API_PORT || 3001}`);
     console.log(`Discord: ${process.env.DISCORD_BOT_TOKEN ? 'Connected' : 'Disabled (no token)'}`);
     console.log(`Database: ${db.isConnected ? Object.keys(db.pools).join(', ') : 'Disabled'}`);
+    console.log(`Billing: ${billing.getStatus().stripeConfigured ? 'Stripe configured' : 'Stripe not configured'}`);
 
     // Graceful shutdown
     const shutdown = async () => {

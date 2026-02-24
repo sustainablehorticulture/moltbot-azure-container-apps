@@ -74,6 +74,18 @@ param databaseEnabled string = 'false'
 @description('OpenRouter model for Red Dog AI engine')
 param openRouterModel string = 'openai/gpt-4o-mini'
 
+@description('Stripe Secret Key')
+@secure()
+param stripeSecretKey string = ''
+
+@description('Stripe Publishable Key')
+@secure()
+param stripePublishableKey string = ''
+
+@description('Stripe Webhook Secret')
+@secure()
+param stripeWebhookSecret string = ''
+
 @description('Container CPU cores')
 param containerCpu string = '1.0'
 
@@ -207,6 +219,18 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'database-connection-string'
           value: !empty(databaseConnectionString) ? databaseConnectionString : 'not-set'
         }
+        {
+          name: 'stripe-secret-key'
+          value: !empty(stripeSecretKey) ? stripeSecretKey : 'not-set'
+        }
+        {
+          name: 'stripe-publishable-key'
+          value: !empty(stripePublishableKey) ? stripePublishableKey : 'not-set'
+        }
+        {
+          name: 'stripe-webhook-secret'
+          value: !empty(stripeWebhookSecret) ? stripeWebhookSecret : 'not-set'
+        }
       ]
     }
     template: {
@@ -291,6 +315,18 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'API_PORT'
               value: '18789'
+            }
+            {
+              name: 'STRIPE_SECRET_KEY'
+              secretRef: 'stripe-secret-key'
+            }
+            {
+              name: 'STRIPE_PUBLISHABLE_KEY'
+              secretRef: 'stripe-publishable-key'
+            }
+            {
+              name: 'STRIPE_WEBHOOK_SECRET'
+              secretRef: 'stripe-webhook-secret'
             }
           ]
           volumeMounts: [

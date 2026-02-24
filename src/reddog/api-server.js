@@ -1,10 +1,12 @@
 const express = require('express');
 const cors = require('cors');
+const BillingSystem = require('./billing-system');
 
 class APIServer {
     constructor(aiEngine, db) {
         this.aiEngine = aiEngine;
         this.db = db;
+        this.billing = new BillingSystem({ db });
         this.app = express();
         this.port = process.env.API_PORT || process.env.GATEWAY_PORT || 3001;
         this.setupMiddleware();
@@ -22,7 +24,8 @@ class APIServer {
             res.json({
                 status: 'ok',
                 database: this.db ? this.db.isConnected : false,
-                databases: this.db ? Object.keys(this.db.pools) : []
+                databases: this.db ? Object.keys(this.db.pools) : [],
+                billing: this.billing.getStatus()
             });
         });
 
@@ -33,7 +36,29 @@ class APIServer {
                 if (!message) {
                     return res.status(400).json({ error: 'message is required' });
                 }
-                const result = await this.aiEngine.chat(message, userId || req.ip);
+                
+                // Check credits for chat operation (1 credit)
+                const userIdentifier = userId || req.ip;
+                const creditCheck = await this.billing.checkCreditsBeforeOperation(userIdentifier, 'api_call');
+                if (!creditCheck.allowed) {
+                    return res.status(402).json({ 
+                        error: 'Insufficient credits',
+                        required: creditCheck.required,
+                        available: creditCheck.available,
+                        suggestion: creditCheck.suggestion
+                    });
+                }
+                
+                const result = await this.aiEngine.chat(message, userIdentifier);
+                
+                // Consume credits for successful response
+                if (result.reply) {
+                    await this.billing.consumeCredits(userIdentifier, 'api_call', 1, {
+                        operation: 'chat',
+                        messageLength: message.length
+                    });
+                }
+                
                 res.json(result);
             } catch (error) {
                 console.error('Chat API error:', error.message);
@@ -119,6 +144,91 @@ class APIServer {
                 return res.status(503).json({ error: 'Database not connected' });
             }
             res.json({ databases: this.db.listConnectedDatabases() });
+        });
+
+        // === Billing Endpoints ===
+        
+        // Get billing summary for user
+        this.app.get('/api/billing/:userOid', async (req, res) => {
+            try {
+                const summary = await this.billing.getBillingSummary(req.params.userOid);
+                res.json(summary);
+            } catch (error) {
+                console.error('Billing summary error:', error.message);
+                res.status(500).json({ error: error.message });
+            }
+        });
+        
+        // Get user credits
+        this.app.get('/api/credits/:userOid', async (req, res) => {
+            try {
+                const credits = await this.billing.getUserCredits(req.params.userOid);
+                res.json(credits);
+            } catch (error) {
+                console.error('Credits error:', error.message);
+                res.status(500).json({ error: error.message });
+            }
+        });
+        
+        // Create payment intent
+        this.app.post('/api/billing/payment', async (req, res) => {
+            try {
+                const { userOid, amount, currency } = req.body;
+                if (!userOid || !amount) {
+                    return res.status(400).json({ error: 'userOid and amount are required' });
+                }
+                const paymentIntent = await this.billing.createPaymentIntent(userOid, amount, currency);
+                res.json(paymentIntent);
+            } catch (error) {
+                console.error('Payment intent error:', error.message);
+                res.status(500).json({ error: error.message });
+            }
+        });
+        
+        // Confirm payment (webhook endpoint)
+        this.app.post('/api/billing/webhook', async (req, res) => {
+            try {
+                // In production, verify Stripe webhook signature
+                const { paymentIntentId } = req.body;
+                if (!paymentIntentId) {
+                    return res.status(400).json({ error: 'paymentIntentId is required' });
+                }
+                const result = await this.billing.confirmPayment(paymentIntentId);
+                res.json(result);
+            } catch (error) {
+                console.error('Webhook error:', error.message);
+                res.status(500).json({ error: error.message });
+            }
+        });
+        
+        // Create subscription
+        this.app.post('/api/billing/subscription', async (req, res) => {
+            try {
+                const { userOid, plan, paymentMethodId } = req.body;
+                if (!userOid || !plan) {
+                    return res.status(400).json({ error: 'userOid and plan are required' });
+                }
+                const subscription = await this.billing.createSubscription(userOid, plan, paymentMethodId);
+                res.json(subscription);
+            } catch (error) {
+                console.error('Subscription error:', error.message);
+                res.status(500).json({ error: error.message });
+            }
+        });
+        
+        // Create user account
+        this.app.post('/api/billing/account', async (req, res) => {
+            try {
+                const { userOid, userEmail, userName, plan } = req.body;
+                if (!userOid || !userEmail) {
+                    return res.status(400).json({ error: 'userOid and userEmail are required' });
+                }
+                const account = await this.billing.createUserAccount(userOid, userEmail, userName, plan);
+                res.json(account);
+            } catch (error) {
+                console.error('Account creation error:', error.message);
+                res.status(500).json({ error: error.message });
+            }
         });
     }
 

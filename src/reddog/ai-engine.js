@@ -3,8 +3,9 @@ const path = require('path');
 const fs = require('fs');
 
 class AIEngine {
-    constructor(db) {
+    constructor(db, billing = null) {
         this.db = db;
+        this.billing = billing;
         this.schemaCache = null;
         this.model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
         this.apiKey = process.env.OPENROUTER_API_KEY;
@@ -194,6 +195,24 @@ If the question does NOT need a database query, just respond normally in plain t
                             error: 'unsafe_query'
                         };
                     }
+                    
+                    // Check credits for query operation (2 credits)
+                    if (this.billing) {
+                        const creditCheck = await this.billing.checkCreditsBeforeOperation(userId, 'farm_query');
+                        if (!creditCheck.allowed) {
+                            const reply = `Sorry mate, I need ${creditCheck.required} credits to run that query but you only have ${creditCheck.available}. ${creditCheck.suggestion}`;
+                            this.addToHistory(userId, 'user', userMessage);
+                            this.addToHistory(userId, 'assistant', reply);
+                            return {
+                                reply,
+                                query: queryPlan.sql,
+                                database: queryPlan.database,
+                                error: 'insufficient_credits',
+                                required: creditCheck.required,
+                                available: creditCheck.available
+                            };
+                        }
+                    }
 
                     console.log(`AI query on '${queryPlan.database}': ${queryPlan.sql}`);
                     const results = await this.db.query(queryPlan.sql, [], queryPlan.database);
@@ -221,6 +240,20 @@ If the question does NOT need a database query, just respond normally in plain t
                     const summaryReply = summaryResponse.data.choices[0].message.content;
                     this.addToHistory(userId, 'user', userMessage);
                     this.addToHistory(userId, 'assistant', summaryReply);
+
+                    // Consume credits for successful query
+                    if (this.billing) {
+                        try {
+                            await this.billing.consumeCredits(userId, 'farm_query', 2, {
+                                operation: 'farm_query',
+                                database: queryPlan.database,
+                                rowCount: results.length
+                            });
+                        } catch (billingError) {
+                            console.error('Failed to consume credits:', billingError.message);
+                            // Don't fail the response, just log the error
+                        }
+                    }
 
                     return {
                         reply: summaryReply,

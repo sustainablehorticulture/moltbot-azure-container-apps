@@ -61,6 +61,15 @@
     },
     "openRouterModel": {
       "value": "${OPENROUTER_MODEL=openai/gpt-4o-mini}"
+    },
+    "stripeSecretKey": {
+      "value": "${STRIPE_SECRET_KEY}"
+    },
+    "stripePublishableKey": {
+      "value": "${STRIPE_PUBLISHABLE_KEY}"
+    },
+    "stripeWebhookSecret": {
+      "value": "${STRIPE_WEBHOOK_SECRET}"
     }
   }
 }

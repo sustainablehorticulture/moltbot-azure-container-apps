@@ -85,6 +85,18 @@ param databaseEnabled string = 'false'
 @description('OpenRouter model for Red Dog AI engine')
 param openRouterModel string = 'openai/gpt-4o-mini'
 
+@description('Stripe Secret Key')
+@secure()
+param stripeSecretKey string = ''
+
+@description('Stripe Publishable Key')
+@secure()
+param stripePublishableKey string = ''
+
+@description('Stripe Webhook Secret')
+@secure()
+param stripeWebhookSecret string = ''
+
 @description('Enable security and availability alerts')
 param enableAlerts bool = true
 
@@ -165,6 +177,9 @@ module clawdbotApp './modules/clawdbot-app.bicep' = {
     databaseNames: databaseNames
     databaseEnabled: databaseEnabled
     openRouterModel: openRouterModel
+    stripeSecretKey: stripeSecretKey
+    stripePublishableKey: stripePublishableKey
+    stripeWebhookSecret: stripeWebhookSecret
     containerCpu: containerCpu
     containerMemory: containerMemory
     minReplicas: minReplicas
