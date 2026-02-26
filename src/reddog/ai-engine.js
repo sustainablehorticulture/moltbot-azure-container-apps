@@ -222,7 +222,14 @@ If the question does NOT need a database query, just respond normally in plain t
                     if (this.billing) {
                         const creditCheck = await this.billing.checkCreditsBeforeOperation(userId, 'farm_query');
                         if (!creditCheck.allowed) {
-                            const reply = `Sorry mate, I need ${creditCheck.required} credits to run that query but you only have ${creditCheck.available}. ${creditCheck.suggestion}`;
+                            let reply;
+                            if (creditCheck.reason === 'Account inactive') {
+                                reply = `G'day mate! Looks like you don't have an active account yet. You'll need to set up billing to use Red Dog's database queries. Contact your admin to get started!`;
+                            } else if (creditCheck.reason === 'Insufficient credits') {
+                                reply = `Sorry mate, I need ${creditCheck.required} credits to run that query but you only have ${creditCheck.available}. ${creditCheck.suggestion}`;
+                            } else {
+                                reply = `Can't run that query right now: ${creditCheck.reason}`;
+                            }
                             this.addToHistory(userId, 'user', userMessage);
                             this.addToHistory(userId, 'assistant', reply);
                             return {
@@ -231,7 +238,8 @@ If the question does NOT need a database query, just respond normally in plain t
                                 database: queryPlan.database,
                                 error: 'insufficient_credits',
                                 required: creditCheck.required,
-                                available: creditCheck.available
+                                available: creditCheck.available,
+                                reason: creditCheck.reason
                             };
                         }
                     }
