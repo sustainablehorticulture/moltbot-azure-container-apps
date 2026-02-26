@@ -75,7 +75,7 @@ class ServiceBusManager {
                 }
             },
             processError: async (err) => {
-                console.error(`[ServiceBus] Error in message listener: ${err.message}`);
+                console.error(`[ServiceBus] Error in message listener: ${err?.message || err || 'Unknown error'}`);
             }
         });
     }
