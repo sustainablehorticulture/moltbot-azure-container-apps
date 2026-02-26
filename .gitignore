@@ -37,3 +37,6 @@ logs/
 # Build outputs
 dist/
 build/
+
+# Control backend (symlinked from external directory)
+src/control/

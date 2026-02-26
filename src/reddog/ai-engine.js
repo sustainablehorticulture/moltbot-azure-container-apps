@@ -3,9 +3,12 @@ const path = require('path');
 const fs = require('fs');
 
 class AIEngine {
-    constructor(db, billing = null) {
+    constructor(db, billing = null, blobStorage = null, serviceBus = null, approvalManager = null) {
         this.db = db;
         this.billing = billing;
+        this.blobStorage = blobStorage;
+        this.serviceBus = serviceBus;
+        this.approvalManager = approvalManager;
         this.schemaCache = null;
         this.model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
         this.apiKey = process.env.OPENROUTER_API_KEY;
@@ -13,6 +16,16 @@ class AIEngine {
         this.maxHistory = parseInt(process.env.CONVERSATION_HISTORY_LENGTH) || 20;
         this.persona = this.loadPersona();
         this.dbContext = this.loadDatabaseContext();
+        
+        // Initialize approval commands if approval manager is available
+        if (this.approvalManager) {
+            const ApprovalCommands = require('./approval-commands');
+            this.approvalCommands = new ApprovalCommands({
+                approvalManager: this.approvalManager,
+                blobStorage: this.blobStorage,
+                serviceBus: this.serviceBus
+            });
+        }
     }
 
     loadDatabaseContext() {
@@ -154,6 +167,15 @@ If the question does NOT need a database query, just respond normally in plain t
             if (userMessage.toLowerCase().trim() === 'clear' || userMessage.toLowerCase().trim() === 'reset') {
                 this.clearHistory(userId);
                 return { reply: "No worries, mate — slate's clean! What's next?" };
+            }
+
+            // Handle approval commands
+            if (this.approvalCommands) {
+                const approvalCommand = this.approvalCommands.parseCommand(userMessage);
+                if (approvalCommand) {
+                    const result = await this.approvalCommands.execute(approvalCommand, userId);
+                    return { reply: result.message, ...result };
+                }
             }
 
             const systemPrompt = this.buildSystemPrompt();

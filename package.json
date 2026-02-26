@@ -8,6 +8,8 @@
     "start:legacy": "node src/moltbot/smart-bot.js"
   },
   "dependencies": {
+    "@azure/service-bus": "^7.9.4",
+    "@azure/storage-blob": "^12.17.0",
     "axios": "^1.6.2",
     "cors": "^2.8.6",
     "discord.js": "^14.14.1",
