@@ -7,8 +7,11 @@ trigger:
     - main
     - master
 
+# Use self-hosted agent pool to bypass parallelism requirement
+# Change to 'vmImage: ubuntu-latest' if you have Microsoft-hosted parallelism
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'Default'  # Self-hosted agent pool
+  # vmImage: 'ubuntu-latest'  # Uncomment this and comment above if using Microsoft-hosted agents
 
 variables:
   REGISTRY: 'cr5eqmkn3bypkyu.azurecr.io'
