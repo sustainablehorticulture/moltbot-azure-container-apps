@@ -16,6 +16,10 @@ class AIEngine {
         this.maxHistory = parseInt(process.env.CONVERSATION_HISTORY_LENGTH) || 20;
         this.persona = this.loadPersona();
         this.dbContext = this.loadDatabaseContext();
+        this.farmId = process.env.FARM_ID || 'grassgum'; // Default farm identifier
+        this.persistentChatEnabled = process.env.PERSISTENT_CHAT_ENABLED !== 'false'; // Enabled by default
+        this.autoSaveInterval = parseInt(process.env.CHAT_AUTOSAVE_INTERVAL) || 5; // Save every 5 messages
+        this.messagesSinceLastSave = new Map(); // Track messages since last save per user
         
         // Initialize approval commands if approval manager is available
         if (this.approvalManager) {
@@ -61,24 +65,98 @@ class AIEngine {
         }
     }
 
-    getHistory(userId) {
+    async getHistory(userId) {
         if (!this.conversations.has(userId)) {
-            this.conversations.set(userId, []);
+            // Load chat history from blob storage on first access
+            await this.loadChatHistoryForUser(userId);
         }
         return this.conversations.get(userId);
     }
 
-    addToHistory(userId, role, content) {
-        const history = this.getHistory(userId);
+    /**
+     * Load chat history from blob storage for a user
+     */
+    async loadChatHistoryForUser(userId) {
+        if (!this.persistentChatEnabled || !this.blobStorage || !this.blobStorage.isConnected) {
+            this.conversations.set(userId, []);
+            return;
+        }
+
+        try {
+            const messages = await this.blobStorage.loadChatHistory({
+                farmId: this.farmId,
+                userId,
+                maxMessages: this.maxHistory
+            });
+            
+            this.conversations.set(userId, messages);
+            this.messagesSinceLastSave.set(userId, 0);
+            
+            if (messages.length > 0) {
+                console.log(`[AI] Loaded ${messages.length} messages from chat history for user ${userId}`);
+            }
+        } catch (err) {
+            console.error(`[AI] Failed to load chat history: ${err.message}`);
+            this.conversations.set(userId, []);
+        }
+    }
+
+    /**
+     * Save chat history to blob storage
+     */
+    async saveChatHistoryForUser(userId) {
+        if (!this.persistentChatEnabled || !this.blobStorage || !this.blobStorage.isConnected) {
+            return;
+        }
+
+        try {
+            const messages = this.conversations.get(userId) || [];
+            if (messages.length === 0) {
+                return;
+            }
+
+            await this.blobStorage.saveChatHistory({
+                farmId: this.farmId,
+                userId,
+                messages,
+                metadata: {
+                    sessionId: `session-${userId}-${Date.now()}`,
+                    model: this.model,
+                    savedAt: new Date().toISOString()
+                }
+            });
+            
+            this.messagesSinceLastSave.set(userId, 0);
+            console.log(`[AI] Saved ${messages.length} messages to chat history for user ${userId}`);
+        } catch (err) {
+            console.error(`[AI] Failed to save chat history: ${err.message}`);
+        }
+    }
+
+    async addToHistory(userId, role, content) {
+        const history = await this.getHistory(userId);
         history.push({ role, content });
+        
         // Keep only the last N messages
         while (history.length > this.maxHistory) {
             history.shift();
         }
+        
+        // Track messages since last save
+        const count = (this.messagesSinceLastSave.get(userId) || 0) + 1;
+        this.messagesSinceLastSave.set(userId, count);
+        
+        // Auto-save if we've reached the interval
+        if (count >= this.autoSaveInterval) {
+            await this.saveChatHistoryForUser(userId);
+        }
     }
 
-    clearHistory(userId) {
+    async clearHistory(userId) {
+        // Save before clearing
+        await this.saveChatHistoryForUser(userId);
         this.conversations.delete(userId);
+        this.messagesSinceLastSave.delete(userId);
     }
 
     async cacheSchema() {
