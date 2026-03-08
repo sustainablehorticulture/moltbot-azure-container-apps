@@ -29,7 +29,8 @@ class ServiceBusManager {
             this.sender = this.client.createSender(this.topicName);
             
             // Subscribe to messages from Trevor
-            this.receiver = this.client.createReceiver(this.topicName, 'red-dog-subscription', {
+            const subscriptionName = process.env.SERVICE_BUS_SUBSCRIPTION || 'reddog-bot';
+            this.receiver = this.client.createReceiver(this.topicName, subscriptionName, {
                 receiveMode: 'peekLock'
             });
             
