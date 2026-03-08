@@ -75,7 +75,24 @@ class ServiceBusManager {
                 }
             },
             processError: async (err) => {
-                console.error(`[ServiceBus] Error in message listener: ${err?.message || err || 'Unknown error'}`);
+                // Properly serialize error objects
+                let errorMsg = 'Unknown error';
+                if (err) {
+                    if (typeof err === 'string') {
+                        errorMsg = err;
+                    } else if (err.message) {
+                        errorMsg = err.message;
+                    } else if (err.code) {
+                        errorMsg = `Error code: ${err.code}`;
+                    } else {
+                        try {
+                            errorMsg = JSON.stringify(err);
+                        } catch {
+                            errorMsg = String(err);
+                        }
+                    }
+                }
+                console.error(`[ServiceBus] Error in message listener: ${errorMsg}`);
             }
         });
     }
