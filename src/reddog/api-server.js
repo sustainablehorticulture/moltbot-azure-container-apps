@@ -3,9 +3,13 @@ const cors = require('cors');
 const BillingSystem = require('./billing-system');
 
 class APIServer {
-    constructor(aiEngine, db) {
+    constructor(aiEngine, db, blobStorage, serviceBus, approvalManager, socialMedia) {
         this.aiEngine = aiEngine;
         this.db = db;
+        this.blobStorage = blobStorage;
+        this.serviceBus = serviceBus;
+        this.approvalManager = approvalManager;
+        this.socialMedia = socialMedia;
         this.billing = new BillingSystem({ db });
         this.app = express();
         this.port = process.env.API_PORT || process.env.GATEWAY_PORT || 3001;
@@ -28,6 +32,12 @@ class APIServer {
                 billing: this.billing.getStatus()
             });
         });
+
+        // Social media routes
+        if (this.socialMedia) {
+            const socialMediaRoutes = require('./routes/social-media')(this.socialMedia);
+            this.app.use('/api/social', socialMediaRoutes);
+        }
 
         // Chat endpoint — send a message, get an AI response (with optional DB queries)
         this.app.post('/api/chat', async (req, res) => {

@@ -7,6 +7,7 @@ const BillingSystem = require('./billing-system');
 const BlobStorageManager = require('./blob-storage');
 const ServiceBusManager = require('./service-bus-client');
 const DataApprovalManager = require('./data-approval-manager');
+const SocialMediaManager = require('./social-media-manager');
 
 async function main() {
     console.log('=== Red Dog Starting ===');
@@ -85,7 +86,14 @@ async function main() {
     console.log('Initializing billing system...');
     const billing = new BillingSystem({ db });
 
-    // 6. Initialize AI engine with database, billing, blob storage, and approval manager
+    // 6. Initialize social media manager
+    console.log('Initializing social media manager...');
+    const socialMedia = new SocialMediaManager({ 
+        db,
+        apiUrl: `http://localhost:${process.env.API_PORT || 3001}`
+    });
+
+    // 7. Initialize AI engine with database, billing, blob storage, and approval manager
     console.log('Initializing AI engine...');
     const ai = new AIEngine(db, billing, blobStorage, serviceBus, approvalManager);
     if (db.isConnected) {
@@ -93,12 +101,12 @@ async function main() {
         await ai.cacheSchema();
     }
 
-    // 7. Start API server
+    // 8. Start API server
     console.log('Starting API server...');
-    const api = new APIServer(ai, db, blobStorage, serviceBus, approvalManager);
+    const api = new APIServer(ai, db, blobStorage, serviceBus, approvalManager, socialMedia);
     await api.start();
 
-    // 8. Start Discord client (optional — runs alongside API)
+    // 9. Start Discord client (optional — runs alongside API)
     console.log('Starting Discord client...');
     const discord = new DiscordClient(ai, blobStorage, approvalManager);
     await discord.start();
@@ -110,6 +118,7 @@ async function main() {
     console.log(`Blob Storage: ${blobStorage.isConnected ? blobStorage.containerName : 'Disabled'}`);
     console.log(`Service Bus:  ${serviceBus.isConnected ? serviceBus.topicName : 'Disabled'}`);
     console.log(`Billing:      ${billing.getStatus().stripeConfigured ? 'Stripe configured' : 'Stripe not configured'}`);
+    console.log(`Social Media: Instagram, Facebook, LinkedIn`);
 
     // Graceful shutdown
     const shutdown = async () => {
