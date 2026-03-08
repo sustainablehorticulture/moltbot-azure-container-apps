@@ -1,0 +1,82 @@
+{
+  "topics": [
+    {
+      "id": "the-farmyard",
+      "name": "The Farmyard",
+      "description": "Core farm operations, monitoring, and sustainability metrics",
+      "subtopics": [
+        {
+          "id": "energy",
+          "name": "Energy",
+          "description": "Energy consumption, generation, efficiency, and renewable energy systems",
+          "keywords": ["energy", "power", "electricity", "solar", "renewable", "consumption", "generation", "battery", "grid"],
+          "relatedTables": ["EnergyMetrics", "SolarGeneration", "PowerConsumption"]
+        },
+        {
+          "id": "iot",
+          "name": "IoT",
+          "description": "Internet of Things devices, sensors, monitoring systems, and automation",
+          "keywords": ["iot", "sensor", "device", "monitoring", "telemetry", "automation", "gateway", "connectivity"],
+          "relatedTables": ["Devices", "SensorReadings", "IoTGateways", "DeviceStatus"]
+        },
+        {
+          "id": "carbon",
+          "name": "Carbon",
+          "description": "Carbon sequestration, emissions, footprint, and carbon credit management",
+          "keywords": ["carbon", "emissions", "sequestration", "footprint", "co2", "greenhouse", "offset", "credits"],
+          "relatedTables": ["CarbonMetrics", "Emissions", "Sequestration", "CarbonCredits"]
+        },
+        {
+          "id": "climate",
+          "name": "Climate",
+          "description": "Weather patterns, climate data, forecasts, and climate adaptation strategies",
+          "keywords": ["climate", "weather", "temperature", "rainfall", "forecast", "humidity", "wind", "conditions"],
+          "relatedTables": ["WeatherData", "ClimateMetrics", "Forecasts", "WeatherStations"]
+        },
+        {
+          "id": "water",
+          "name": "Water",
+          "description": "Water usage, irrigation, quality, conservation, and water resource management",
+          "keywords": ["water", "irrigation", "moisture", "rainfall", "usage", "conservation", "quality", "flow"],
+          "relatedTables": ["WaterUsage", "IrrigationSystems", "SoilMoisture", "WaterQuality"]
+        },
+        {
+          "id": "soil-health",
+          "name": "Soil Health",
+          "description": "Soil composition, nutrients, pH, organic matter, and soil quality metrics",
+          "keywords": ["soil", "nutrients", "ph", "organic matter", "composition", "fertility", "erosion", "health"],
+          "relatedTables": ["SoilTests", "SoilMetrics", "NutrientLevels", "SoilComposition"]
+        },
+        {
+          "id": "plant-health",
+          "name": "Plant Health",
+          "description": "Crop health, growth stages, disease detection, and plant monitoring",
+          "keywords": ["plant", "crop", "growth", "health", "disease", "pest", "yield", "vegetation", "ndvi"],
+          "relatedTables": ["CropHealth", "GrowthStages", "DiseaseDetection", "YieldData", "PlantMonitoring"]
+        }
+      ]
+    },
+    {
+      "id": "share-our-data",
+      "name": "Share Our Data",
+      "description": "Data sharing, permissions, approvals, and external data access management",
+      "subtopics": [],
+      "keywords": ["share", "sharing", "permission", "approval", "access", "export", "provider", "data key"],
+      "relatedTables": ["DataApprovals", "SharedData", "Permissions", "DataKeys", "ExternalProviders"]
+    },
+    {
+      "id": "farmg8",
+      "name": "FarmG8",
+      "description": "Farm marketing, communications, and business operations",
+      "subtopics": [
+        {
+          "id": "marketing",
+          "name": "Marketing",
+          "description": "Social media, advertising, campaigns, and farm marketing activities",
+          "keywords": ["marketing", "social media", "advertising", "campaign", "promotion", "content", "engagement"],
+          "relatedTables": ["SocialMediaPosts", "Campaigns", "MarketingMetrics", "AdPerformance"]
+        }
+      ]
+    }
+  ]
+}

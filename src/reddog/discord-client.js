@@ -1,8 +1,9 @@
 const { Client, GatewayIntentBits, Partials, ChannelType } = require('discord.js');
 
 class DiscordClient {
-    constructor(aiEngine) {
+    constructor(aiEngine, agentComm = null) {
         this.aiEngine = aiEngine;
+        this.agentComm = agentComm;
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -56,6 +57,31 @@ class DiscordClient {
             // Show typing indicator while processing
             await message.channel.sendTyping();
 
+            // Check for @mentions of other agents (Trevor, Daisy Bell)
+            if (this.agentComm) {
+                const { mentions, cleanedMessage } = this.agentComm.detectMentions(content);
+                
+                if (mentions.length > 0) {
+                    console.log(`Discord: Detected mentions: ${mentions.join(', ')}`);
+                    
+                    // Route message to mentioned agents
+                    const conversationId = `discord-${message.id}`;
+                    await this.agentComm.routeToAgents({
+                        message: cleanedMessage || content,
+                        mentions,
+                        userId: message.author.id,
+                        channelId: message.channel.id,
+                        conversationId
+                    });
+
+                    // Acknowledge routing
+                    const agentNames = mentions.map(id => this.agentComm.getAgentDisplayName(id)).join(' and ');
+                    await message.reply(`📨 Right-o! I've sent that message to ${agentNames}. They'll get back to ya soon, mate!`);
+                    return;
+                }
+            }
+
+            // Normal Red Dog response (no agent mentions)
             const result = await this.aiEngine.chat(content, message.author.id);
 
             // Discord has a 2000 char limit — split if needed
@@ -103,7 +129,22 @@ class DiscordClient {
         console.log('Discord: Client started');
     }
 
+    async sendMessage(channelId, content) {
+        try {
+            const channel = await this.client.channels.fetch(channelId);
+            if (channel && channel.isTextBased()) {
+                await channel.send(content);
+            }
+        } catch (error) {
+            console.error(`Discord: Failed to send message to channel ${channelId}:`, error.message);
+            throw error;
+        }
+    }
+
     async stop() {
+        if (this.agentComm) {
+            this.agentComm.cleanup();
+        }
         this.client.destroy();
         console.log('Discord: Client stopped');
     }

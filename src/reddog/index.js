@@ -8,6 +8,7 @@ const BlobStorageManager = require('./blob-storage');
 const ServiceBusManager = require('./service-bus-client');
 const DataApprovalManager = require('./data-approval-manager');
 const SocialMediaManager = require('./social-media-manager');
+const AgentCommunicationManager = require('./agent-communication');
 
 async function main() {
     console.log('=== Red Dog Starting ===');
@@ -106,9 +107,19 @@ async function main() {
     const api = new APIServer(ai, db, blobStorage, serviceBus, approvalManager, socialMedia);
     await api.start();
 
-    // 9. Start Discord client (optional — runs alongside API)
+    // 9. Initialize agent communication manager
+    console.log('Initializing agent communication...');
+    const discord = new DiscordClient(ai);
+    const agentComm = new AgentCommunicationManager({
+        serviceBus,
+        discord
+    });
+    
+    // Set agent communication in Discord client
+    discord.agentComm = agentComm;
+
+    // 10. Start Discord client (optional — runs alongside API)
     console.log('Starting Discord client...');
-    const discord = new DiscordClient(ai, blobStorage, approvalManager);
     await discord.start();
 
     console.log('\n=== Red Dog Ready ===');
@@ -119,6 +130,7 @@ async function main() {
     console.log(`Service Bus:  ${serviceBus.isConnected ? serviceBus.topicName : 'Disabled'}`);
     console.log(`Billing:      ${billing.getStatus().stripeConfigured ? 'Stripe configured' : 'Stripe not configured'}`);
     console.log(`Social Media: Instagram, Facebook, LinkedIn`);
+    console.log(`Agent Comms:  ${agentComm.getStatus().serviceBusConnected ? 'Trevor, Daisy Bell' : 'Disabled'}`);
 
     // Graceful shutdown
     const shutdown = async () => {

@@ -1,6 +1,8 @@
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
+const TopicManager = require('./topic-manager');
+const KnowledgeGraph = require('./knowledge-graph');
 
 class AIEngine {
     constructor(db, billing = null, blobStorage = null, serviceBus = null, approvalManager = null) {
@@ -16,6 +18,8 @@ class AIEngine {
         this.maxHistory = parseInt(process.env.CONVERSATION_HISTORY_LENGTH) || 20;
         this.persona = this.loadPersona();
         this.dbContext = this.loadDatabaseContext();
+        this.topicManager = new TopicManager();
+        this.knowledgeGraph = new KnowledgeGraph();
         this.farmId = process.env.FARM_ID || 'grassgum'; // Default farm identifier
         this.persistentChatEnabled = process.env.PERSISTENT_CHAT_ENABLED !== 'false'; // Enabled by default
         this.autoSaveInterval = parseInt(process.env.CHAT_AUTOSAVE_INTERVAL) || 5; // Save every 5 messages
@@ -203,6 +207,16 @@ Rules for SQL queries:
 
 If the question does NOT need a database query, just respond normally in plain text with your Red Dog personality.`;
 
+        // Add topic awareness
+        if (this.topicManager) {
+            prompt += this.topicManager.buildTopicAwarePrompt();
+        }
+
+        // Add knowledge graph ontology
+        if (this.knowledgeGraph) {
+            prompt += this.knowledgeGraph.getOntologySummary();
+        }
+
         // Add database relationship context
         if (this.dbContext) {
             prompt += `\n\n=== DATABASE RELATIONSHIPS ===\n${this.dbContext.overview}\n`;
@@ -247,6 +261,12 @@ If the question does NOT need a database query, just respond normally in plain t
                 return { reply: "No worries, mate — slate's clean! What's next?" };
             }
 
+            // Handle topic list request
+            if (this.topicManager && this.topicManager.isTopicListRequest(userMessage)) {
+                const topicList = this.topicManager.formatTopicsForDisplay();
+                return { reply: topicList };
+            }
+
             // Handle approval commands
             if (this.approvalCommands) {
                 const approvalCommand = this.approvalCommands.parseCommand(userMessage);
@@ -256,13 +276,29 @@ If the question does NOT need a database query, just respond normally in plain t
                 }
             }
 
+            // Detect topics in the message
+            let detectedTopics = [];
+            let topicContext = '';
+            if (this.topicManager) {
+                detectedTopics = this.topicManager.detectTopics(userMessage);
+                if (detectedTopics.length > 0) {
+                    topicContext = this.topicManager.buildTopicContext(detectedTopics);
+                    console.log(`[AI] Detected topics: ${detectedTopics.map(t => t.name).join(', ')}`);
+                }
+            }
+
             const systemPrompt = this.buildSystemPrompt();
             const history = await this.getHistory(userId);
+
+            // Add topic context to user message if topics detected
+            const enhancedMessage = topicContext 
+                ? `${userMessage}${topicContext}`
+                : userMessage;
 
             const messages = [
                 { role: 'system', content: systemPrompt },
                 ...history,
-                { role: 'user', content: userMessage }
+                { role: 'user', content: enhancedMessage }
             ];
 
             // Step 1: Ask AI what to do

@@ -1,0 +1,278 @@
+{
+  "metadata": {
+    "name": "Agentic Agriculture Ontology",
+    "version": "1.0.0",
+    "description": "Knowledge graph ontology for farm operations, sustainability, and data management",
+    "namespace": "https://agenticag.com/ontology#"
+  },
+  "classes": {
+    "Farm": {
+      "description": "A farm property with land, operations, and resources",
+      "properties": ["name", "location", "size", "farmType", "owner"],
+      "relationships": ["hasPaddock", "hasDevice", "hasLivestock", "hasCrop", "employs"]
+    },
+    "Paddock": {
+      "description": "A field or paddock within a farm",
+      "properties": ["name", "area", "soilType", "currentCrop", "irrigationType"],
+      "relationships": ["partOf", "hasDevice", "growsCrop", "adjacentTo"]
+    },
+    "Device": {
+      "description": "IoT device or sensor",
+      "properties": ["deviceId", "deviceType", "manufacturer", "installDate", "status"],
+      "relationships": ["locatedAt", "monitors", "partOf", "communicatesWith"]
+    },
+    "Sensor": {
+      "description": "Measurement sensor (extends Device)",
+      "parent": "Device",
+      "properties": ["measurementType", "unit", "accuracy", "frequency"],
+      "relationships": ["measures", "locatedAt"]
+    },
+    "Crop": {
+      "description": "Agricultural crop or plant",
+      "properties": ["species", "variety", "plantingDate", "harvestDate", "growthStage"],
+      "relationships": ["grownIn", "requires", "produces", "susceptibleTo"]
+    },
+    "Livestock": {
+      "description": "Farm animals",
+      "properties": ["species", "breed", "count", "age", "healthStatus"],
+      "relationships": ["grazesOn", "requires", "produces"]
+    },
+    "Resource": {
+      "description": "Farm resource (water, energy, nutrients)",
+      "properties": ["resourceType", "quantity", "unit", "cost"],
+      "relationships": ["usedBy", "storedIn", "suppliedBy"]
+    },
+    "Water": {
+      "description": "Water resource",
+      "parent": "Resource",
+      "properties": ["source", "quality", "flowRate", "storageCapacity"],
+      "relationships": ["irrigates", "storedIn", "suppliedBy"]
+    },
+    "Energy": {
+      "description": "Energy resource",
+      "parent": "Resource",
+      "properties": ["energyType", "capacity", "generation", "consumption"],
+      "relationships": ["powersDevice", "generatedBy", "storedIn"]
+    },
+    "Soil": {
+      "description": "Soil characteristics and health",
+      "properties": ["soilType", "pH", "organicMatter", "nutrients", "moisture"],
+      "relationships": ["foundIn", "supports", "requires"]
+    },
+    "Weather": {
+      "description": "Weather and climate data",
+      "properties": ["temperature", "rainfall", "humidity", "windSpeed", "conditions"],
+      "relationships": ["affects", "measuredBy", "forecastFor"]
+    },
+    "Metric": {
+      "description": "Measurement or metric",
+      "properties": ["metricType", "value", "unit", "timestamp", "source"],
+      "relationships": ["measuredBy", "relatesTo", "indicatesHealth"]
+    },
+    "CarbonMetric": {
+      "description": "Carbon-related measurement",
+      "parent": "Metric",
+      "properties": ["carbonType", "sequestration", "emissions", "netBalance"],
+      "relationships": ["measuredIn", "contributesTo"]
+    },
+    "Event": {
+      "description": "Farm event or activity",
+      "properties": ["eventType", "timestamp", "duration", "status", "outcome"],
+      "relationships": ["occursAt", "involves", "triggeredBy", "results"]
+    },
+    "Person": {
+      "description": "Person (farmer, worker, advisor)",
+      "properties": ["name", "role", "expertise", "contact"],
+      "relationships": ["worksAt", "manages", "advises", "owns"]
+    },
+    "DataProvider": {
+      "description": "External data provider or service",
+      "properties": ["providerName", "dataType", "apiEndpoint", "credentialType"],
+      "relationships": ["provides", "integratesWith", "requires"]
+    },
+    "Disease": {
+      "description": "Plant or animal disease",
+      "properties": ["diseaseName", "severity", "symptoms", "treatment"],
+      "relationships": ["affects", "detectedBy", "treatedWith"]
+    },
+    "Pest": {
+      "description": "Agricultural pest",
+      "properties": ["pestName", "population", "damage", "control"],
+      "relationships": ["infests", "affects", "controlledBy"]
+    }
+  },
+  "relationships": {
+    "hasPaddock": {
+      "domain": "Farm",
+      "range": "Paddock",
+      "inverse": "partOf",
+      "description": "Farm contains paddocks"
+    },
+    "hasDevice": {
+      "domain": ["Farm", "Paddock"],
+      "range": "Device",
+      "inverse": "locatedAt",
+      "description": "Entity has IoT devices"
+    },
+    "monitors": {
+      "domain": "Device",
+      "range": ["Crop", "Soil", "Water", "Weather", "Livestock"],
+      "description": "Device monitors an entity"
+    },
+    "measures": {
+      "domain": "Sensor",
+      "range": "Metric",
+      "description": "Sensor measures a metric"
+    },
+    "growsCrop": {
+      "domain": "Paddock",
+      "range": "Crop",
+      "inverse": "grownIn",
+      "description": "Paddock grows a crop"
+    },
+    "irrigates": {
+      "domain": "Water",
+      "range": ["Paddock", "Crop"],
+      "description": "Water irrigates land or crops"
+    },
+    "affects": {
+      "domain": ["Weather", "Disease", "Pest"],
+      "range": ["Crop", "Livestock", "Soil"],
+      "description": "Entity affects another entity"
+    },
+    "requires": {
+      "domain": ["Crop", "Livestock"],
+      "range": ["Water", "Energy", "Resource"],
+      "description": "Entity requires a resource"
+    },
+    "produces": {
+      "domain": ["Crop", "Livestock", "Farm"],
+      "range": ["Resource", "Metric"],
+      "description": "Entity produces something"
+    },
+    "manages": {
+      "domain": "Person",
+      "range": ["Farm", "Paddock"],
+      "description": "Person manages an entity"
+    },
+    "provides": {
+      "domain": "DataProvider",
+      "range": ["Metric", "Weather", "Soil"],
+      "description": "Provider supplies data"
+    },
+    "indicatesHealth": {
+      "domain": "Metric",
+      "range": ["Crop", "Soil", "Livestock"],
+      "description": "Metric indicates health status"
+    },
+    "contributesTo": {
+      "domain": ["CarbonMetric", "Energy"],
+      "range": "Metric",
+      "description": "Entity contributes to a metric"
+    }
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name or identifier"
+    },
+    "location": {
+      "type": "geo",
+      "description": "Geographic location (lat/lon)"
+    },
+    "timestamp": {
+      "type": "datetime",
+      "description": "Date and time"
+    },
+    "value": {
+      "type": "number",
+      "description": "Numeric value"
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unit of measurement"
+    },
+    "status": {
+      "type": "enum",
+      "values": ["active", "inactive", "maintenance", "error"],
+      "description": "Status state"
+    },
+    "healthStatus": {
+      "type": "enum",
+      "values": ["healthy", "warning", "critical", "unknown"],
+      "description": "Health status"
+    }
+  },
+  "rules": {
+    "inference": [
+      {
+        "name": "TransitiveLocation",
+        "description": "If Device is located at Paddock, and Paddock is part of Farm, then Device is located at Farm",
+        "pattern": "(?device locatedAt ?paddock) AND (?paddock partOf ?farm) => (?device locatedAt ?farm)"
+      },
+      {
+        "name": "CropWaterRequirement",
+        "description": "If Crop requires Water, and Water irrigates Paddock, and Crop grows in Paddock, then water requirement is met",
+        "pattern": "(?crop requires Water) AND (?water irrigates ?paddock) AND (?crop grownIn ?paddock) => (?crop hasWater true)"
+      },
+      {
+        "name": "DeviceMonitoring",
+        "description": "If Sensor measures Metric, and Metric indicates health of Crop, then Sensor monitors Crop",
+        "pattern": "(?sensor measures ?metric) AND (?metric indicatesHealth ?crop) => (?sensor monitors ?crop)"
+      },
+      {
+        "name": "ResourceConsumption",
+        "description": "If Entity requires Resource, and Resource is used by Entity, track consumption",
+        "pattern": "(?entity requires ?resource) AND (?resource usedBy ?entity) => (?entity consumes ?resource)"
+      }
+    ],
+    "constraints": [
+      {
+        "name": "DeviceLocation",
+        "description": "Every Device must be located at a Farm or Paddock",
+        "constraint": "Device => EXISTS locatedAt (Farm OR Paddock)"
+      },
+      {
+        "name": "CropGrowth",
+        "description": "Crop can only grow in one Paddock at a time",
+        "constraint": "Crop => UNIQUE grownIn Paddock"
+      },
+      {
+        "name": "MetricSource",
+        "description": "Every Metric must have a source (Sensor or DataProvider)",
+        "constraint": "Metric => EXISTS (measuredBy Sensor OR provides DataProvider)"
+      }
+    ]
+  },
+  "taxonomies": {
+    "DeviceTypes": {
+      "description": "Types of IoT devices",
+      "hierarchy": {
+        "Sensor": ["SoilMoistureSensor", "TemperatureSensor", "RainfallSensor", "pHSensor", "NDVISensor"],
+        "Actuator": ["IrrigationValve", "Pump", "VentilationFan"],
+        "Gateway": ["LoRaWANGateway", "CellularGateway", "WiFiGateway"],
+        "Camera": ["SecurityCamera", "CropCamera", "LivestockCamera"]
+      }
+    },
+    "CropTypes": {
+      "description": "Types of crops",
+      "hierarchy": {
+        "Cereal": ["Wheat", "Barley", "Oats", "Corn"],
+        "Legume": ["Soybean", "Peas", "Lentils", "Chickpeas"],
+        "Vegetable": ["Tomato", "Lettuce", "Carrot", "Potato"],
+        "Fruit": ["Apple", "Orange", "Grape", "Strawberry"],
+        "Pasture": ["Ryegrass", "Clover", "Lucerne"]
+      }
+    },
+    "MetricTypes": {
+      "description": "Types of metrics",
+      "hierarchy": {
+        "Environmental": ["Temperature", "Humidity", "Rainfall", "WindSpeed"],
+        "Soil": ["SoilMoisture", "SoilpH", "SoilNutrients", "SoilTemperature"],
+        "Plant": ["NDVI", "GrowthStage", "LeafArea", "YieldEstimate"],
+        "Resource": ["WaterUsage", "EnergyConsumption", "FuelUsage"],
+        "Carbon": ["Sequestration", "Emissions", "NetBalance"]
+      }
+    }
+  }
+}

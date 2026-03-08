@@ -157,6 +157,37 @@ class ServiceBusManager {
     }
 
     /**
+     * Send a message to another agent (Trevor or Daisy Bell)
+     */
+    async sendToAgent({ agent, message, context, conversationId }) {
+        const messageId = this.generateRequestId();
+        
+        return await this.sendMessage('agent-message', {
+            messageId,
+            from: 'red-dog',
+            to: agent, // 'trevor' or 'daisy-bell'
+            message,
+            context,
+            conversationId,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    /**
+     * Reply to an agent message
+     */
+    async replyToAgent({ messageId, agent, reply, conversationId }) {
+        return await this.sendMessage('agent-reply', {
+            replyToMessageId: messageId,
+            from: 'red-dog',
+            to: agent,
+            reply,
+            conversationId,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    /**
      * Generate unique request ID
      */
     generateRequestId() {
