@@ -243,7 +243,7 @@ If the question does NOT need a database query, just respond normally in plain t
         try {
             // Handle special commands
             if (userMessage.toLowerCase().trim() === 'clear' || userMessage.toLowerCase().trim() === 'reset') {
-                this.clearHistory(userId);
+                await this.clearHistory(userId);
                 return { reply: "No worries, mate — slate's clean! What's next?" };
             }
 
@@ -257,7 +257,7 @@ If the question does NOT need a database query, just respond normally in plain t
             }
 
             const systemPrompt = this.buildSystemPrompt();
-            const history = this.getHistory(userId);
+            const history = await this.getHistory(userId);
 
             const messages = [
                 { role: 'system', content: systemPrompt },
@@ -286,8 +286,8 @@ If the question does NOT need a database query, just respond normally in plain t
 
                     if (this.isUnsafeQuery(queryPlan.sql)) {
                         const reply = this.persona.unsafeQueryMessage;
-                        this.addToHistory(userId, 'user', userMessage);
-                        this.addToHistory(userId, 'assistant', reply);
+                        await this.addToHistory(userId, 'user', userMessage);
+                        await this.addToHistory(userId, 'assistant', reply);
                         return {
                             reply,
                             query: queryPlan.sql,
@@ -308,8 +308,8 @@ If the question does NOT need a database query, just respond normally in plain t
                             } else {
                                 reply = `Can't run that query right now: ${creditCheck.reason}`;
                             }
-                            this.addToHistory(userId, 'user', userMessage);
-                            this.addToHistory(userId, 'assistant', reply);
+                            await this.addToHistory(userId, 'user', userMessage);
+                            await this.addToHistory(userId, 'assistant', reply);
                             return {
                                 reply,
                                 query: queryPlan.sql,
@@ -346,8 +346,8 @@ If the question does NOT need a database query, just respond normally in plain t
                     });
 
                     const summaryReply = summaryResponse.data.choices[0].message.content;
-                    this.addToHistory(userId, 'user', userMessage);
-                    this.addToHistory(userId, 'assistant', summaryReply);
+                    await this.addToHistory(userId, 'user', userMessage);
+                    await this.addToHistory(userId, 'assistant', summaryReply);
 
                     // Consume credits for successful query
                     if (this.billing) {
@@ -373,8 +373,8 @@ If the question does NOT need a database query, just respond normally in plain t
                 } catch (queryError) {
                     console.error('AI-driven query failed:', queryError.message);
                     const errReply = `Bit of a hiccup fetching that data, mate: ${queryError.message}`;
-                    this.addToHistory(userId, 'user', userMessage);
-                    this.addToHistory(userId, 'assistant', errReply);
+                    await this.addToHistory(userId, 'user', userMessage);
+                    await this.addToHistory(userId, 'assistant', errReply);
                     return {
                         reply: errReply,
                         error: queryError.message
@@ -383,8 +383,8 @@ If the question does NOT need a database query, just respond normally in plain t
             }
 
             // No query needed — return the AI's direct response
-            this.addToHistory(userId, 'user', userMessage);
-            this.addToHistory(userId, 'assistant', aiReply);
+            await this.addToHistory(userId, 'user', userMessage);
+            await this.addToHistory(userId, 'assistant', aiReply);
             return { reply: aiReply };
         } catch (error) {
             console.error('AI response error:', error.message);
