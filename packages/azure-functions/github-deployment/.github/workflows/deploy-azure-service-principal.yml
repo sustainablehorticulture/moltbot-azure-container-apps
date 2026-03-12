@@ -1,0 +1,56 @@
+name: Deploy LoRaWAN Control to Azure Functions
+
+on:
+  push:
+    branches: [ main, master ]
+    paths: [ 'lorawan-control/**' ]
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_NAME: agricultural-lorawan-control
+  NODE_VERSION: '22.x'
+  RESOURCE_GROUP: AgenticAg
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@v3
+
+    - name: 'Setup Node.js ${{ env.NODE_VERSION }}'
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: 'Install dependencies'
+      run: |
+        cd lorawan-control
+        npm install --production
+
+    - name: 'Zip deployment package'
+      run: |
+        cd lorawan-control
+        zip -r ../lorawan-control-deploy.zip .
+
+    - name: 'Login to Azure'
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: 'Deploy to Azure Functions'
+      uses: Azure/functions-action@v1
+      with:
+        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+        package: './lorawan-control-deploy.zip'
+
+    - name: 'Logout from Azure'
+      run: az logout
+
+    - name: 'Deployment Summary'
+      run: |
+        echo "🚀 LoRaWAN Control Functions deployed successfully!"
+        echo "📱 Function App: ${{ env.AZURE_FUNCTIONAPP_NAME }}"
+        echo "🌐 URL: https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net"
+        echo "🔗 API: https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api/sites/{siteId}/..."
+        echo "✅ Multi-site LoRaWAN control is ready!"

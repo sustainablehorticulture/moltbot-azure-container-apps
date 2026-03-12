@@ -1,0 +1,41 @@
+name: Deploy Alert System Functions
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        
+    - name: Install Alert System dependencies
+      run: |
+        npm install --production
+        
+    - name: Create deployment package
+      run: |
+        zip -r deploy.zip .
+        
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Deploy to Azure Functions
+      uses: Azure/functions-action@v1
+      with:
+        app-name: 'agricultural-alert-system'
+        package: './deploy.zip'
+        
+    - name: Logout from Azure
+      run: az logout

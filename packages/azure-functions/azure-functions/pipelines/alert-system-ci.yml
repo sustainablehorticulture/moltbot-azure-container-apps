@@ -1,0 +1,87 @@
+# Azure DevOps CI/CD Pipeline for Alert System Functions
+
+trigger:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - azure-functions/alert-system/*
+
+pr:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - azure-functions/alert-system/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  azureSubscription: 'your-azure-subscription-connection'
+  functionAppName: 'agricultural-alert-system'
+  workingDirectory: '$(System.DefaultWorkingDirectory)/azure-functions/alert-system'
+
+stages:
+- stage: Build
+  displayName: 'Build and Test Alert System Functions'
+  jobs:
+  - job: Build
+    displayName: 'Build Alert System'
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+      displayName: 'Install Node.js'
+
+    - script: |
+        cd $(workingDirectory)
+        npm install
+        npm test --if-present
+      displayName: 'Install Dependencies and Test'
+
+    - task: ArchiveFiles@2
+      displayName: 'Archive Alert System Functions'
+      inputs:
+        rootFolderOrFile: '$(workingDirectory)'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/alert-system.zip'
+        replaceExistingArchive: true
+
+    - publish: '$(Build.ArtifactStagingDirectory)/alert-system.zip'
+      artifact: 'alert-system-drop'
+      displayName: 'Publish Alert System Artifact'
+
+- stage: Deploy
+  displayName: 'Deploy Alert System Functions'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployAlertSystem
+    displayName: 'Deploy to Azure Functions'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: alert-system-drop
+            displayName: 'Download Alert System Artifact'
+
+          - task: AzureFunctionApp@1
+            displayName: 'Deploy Alert System to Azure Functions'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              appType: 'functionApp'
+              appName: '$(functionAppName)'
+              package: '$(Pipeline.Workspace)/alert-system-drop/alert-system.zip'
+              deploymentMethod: 'runFromPackage'
+
+          - script: |
+              echo "Alert System Functions deployed successfully!"
+              echo "Function App: $(functionAppName)"
+              echo "Deployment URL: https://$(functionAppName).azurewebsites.net"
+            displayName: 'Deployment Confirmation'

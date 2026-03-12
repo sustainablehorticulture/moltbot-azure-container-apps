@@ -1,0 +1,62 @@
+# Azure DevOps Pipeline - LoRaWAN Control CI/CD
+
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    include:
+    - lorawan/*
+    - services/lt2222Service.js
+    - services/deviceManager.js
+    - host.json
+    - package.lorawan.json
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: 'agricultural-automation-variables'
+  - name: 'functionAppName'
+    value: 'agricultural-lorawan-functions'
+
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'
+  displayName: 'Install Node.js'
+
+- task: ArchiveFiles@2
+  displayName: 'Archive LoRaWAN Functions'
+  inputs:
+    rootFolderOrFile: '$(Build.SourcesDirectory)'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/lorawan-functions.zip'
+    replaceExistingArchive: true
+    include:
+      - lorawan/**
+      - services/lt2222Service.js
+      - services/deviceManager.js
+      - host.json
+      - package.lorawan.json
+      - local.settings.json
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact'
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/lorawan-functions.zip'
+    ArtifactName: 'lorawan-functions'
+    publishLocation: 'Container'
+
+- task: AzureFunctionApp@1
+  displayName: 'Deploy LoRaWAN Functions'
+  inputs:
+    azureSubscription: '$(azureSubscription)'
+    appType: 'functionApp'
+    appName: '$(functionAppName)'
+    package: '$(Build.ArtifactStagingDirectory)/lorawan-functions.zip'
+    runtimeStack: 'NODE|18'
+    startUpCommand: 'npm install'
+    deploymentMethod: 'runFromPackage'

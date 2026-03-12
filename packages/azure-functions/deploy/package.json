@@ -1,0 +1,35 @@
+{
+  "name": "agricultural-automation-functions",
+  "version": "1.0.0",
+  "description": "Multi-site agricultural automation Azure Functions with privacy isolation",
+  "scripts": {
+    "start": "func start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "axios": "^1.6.0",
+    "uuid": "^9.0.1",
+    "twilio": "^4.19.0",
+    "@sendgrid/mail": "^7.7.0",
+    "@azure/communication-sms": "^1.0.0",
+    "@azure/communication-email": "^1.0.0"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "^4.x"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "agricultural",
+    "automation",
+    "lorawan",
+    "alerts",
+    "azure-functions",
+    "multi-site",
+    "privacy"
+  ],
+  "author": "Agricultural Automation Team",
+  "license": "MIT"
+}

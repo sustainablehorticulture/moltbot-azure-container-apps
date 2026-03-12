@@ -1,0 +1,81 @@
+# Azure DevOps Pipeline - Release Pipeline
+
+trigger: none
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: 'agricultural-automation-variables'
+
+stages:
+- stage: Deploy_Alerts
+  displayName: 'Deploy Alert System'
+  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual')))
+  jobs:
+  - job: DeployAlerts
+    displayName: 'Deploy Alert Functions'
+    steps:
+    - download: current
+      artifact: alerts-functions
+      displayName: 'Download Alert Functions Artifact'
+    
+    - task: AzureFunctionApp@1
+      displayName: 'Deploy Alert Functions to Production'
+      inputs:
+        azureSubscription: '$(azureSubscription)'
+        appType: 'functionApp'
+        appName: '$(alertsFunctionAppName)'
+        package: '$(Pipeline.Workspace)/alerts-functions/alerts-functions.zip'
+        runtimeStack: 'NODE|18'
+        deploymentMethod: 'runFromPackage'
+
+- stage: Deploy_LoRaWAN
+  displayName: 'Deploy LoRaWAN Control'
+  condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual')))
+  jobs:
+  - job: DeployLoRaWAN
+    displayName: 'Deploy LoRaWAN Functions'
+    steps:
+    - download: current
+      artifact: lorawan-functions
+      displayName: 'Download LoRaWAN Functions Artifact'
+    
+    - task: AzureFunctionApp@1
+      displayName: 'Deploy LoRaWAN Functions to Production'
+      inputs:
+        azureSubscription: '$(azureSubscription)'
+        appType: 'functionApp'
+        appName: '$(lorawanFunctionAppName)'
+        package: '$(Pipeline.Workspace)/lorawan-functions/lorawan-functions.zip'
+        runtimeStack: 'NODE|18'
+        deploymentMethod: 'runFromPackage'
+
+- stage: Health_Check
+  displayName: 'Health Check and Validation'
+  dependsOn: 
+  - Deploy_Alerts
+  - Deploy_LoRaWAN
+  condition: succeeded()
+  jobs:
+  - job: HealthCheck
+    displayName: 'Validate Deployments'
+    steps:
+    - task: Bash@3
+      displayName: 'Test Alert Functions'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "Testing Alert Functions..."
+          curl -f "https://$(alertsFunctionAppName).azurewebsites.net/api/alerts/config?code=$(alertsFunctionKey)" || exit 1
+          echo "Alert Functions: ✅ OK"
+    
+    - task: Bash@3
+      displayName: 'Test LoRaWAN Functions'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "Testing LoRaWAN Functions..."
+          curl -f "https://$(lorawanFunctionAppName).azurewebsites.net/api/lorawan/device?code=$(lorawanFunctionKey)" || exit 1
+          echo "LoRaWAN Functions: ✅ OK"

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert System Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1, h2 {
+            color: #2c3e50;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input, select, button, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        
+        button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 10px;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background-color: #c0392b;
+        }
+        
+        .success {
+            background-color: #28a745;
+        }
+        
+        .success:hover {
+            background-color: #218838;
+        }
+        
+        .info {
+            background-color: #17a2b8;
+        }
+        
+        .info:hover {
+            background-color: #138496;
+        }
+        
+        .response {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .success-response {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        
+        .error-response {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚨 Alert System Test Page</h1>
+    
+    <div class="container">
+        <h2>Configuration</h2>
+        <div class="form-group">
+            <label for="baseUrl">Alert Function App URL:</label>
+            <input type="text" id="baseUrl" value="https://backendalerts-e9c2gdf3ejdzdgfp.australiasoutheast-01.azurewebsites.net" placeholder="https://your-alert-function-app.azurewebsites.net">
+        </div>
+        <div class="form-group">
+            <label for="functionKey">Function Key:</label>
+            <input type="password" id="functionKey" placeholder="Your Azure Function key">
+        </div>
+        <div class="form-group">
+            <label for="siteId">Site ID:</label>
+            <input type="text" id="siteId" value="farm-a" placeholder="farm-a">
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="container">
+            <h2>Alert Processing</h2>
+            <div class="form-group">
+                <label for="sensorId">Sensor ID:</label>
+                <input type="text" id="sensorId" value="IR1OT" placeholder="IR1OT">
+            </div>
+            <div class="form-group">
+                <label for="sensorValue">Sensor Value:</label>
+                <input type="number" id="sensorValue" value="40" placeholder="40">
+            </div>
+            <div class="form-group">
+                <label for="deviceId">Device ID:</label>
+                <input type="text" id="deviceId" value="BD-BZD" placeholder="BD-BZD">
+            </div>
+            <button onclick="processAlert()" class="success">🔔 Process Alert</button>
+            <button onclick="batchProcessAlerts()" class="info">📦 Batch Process</button>
+            <div id="alertResponse" class="response"></div>
+        </div>
+
+        <div class="container">
+            <h2>Send Notifications</h2>
+            <div class="form-group">
+                <label for="notificationType">Notification Type:</label>
+                <select id="notificationType">
+                    <option value="sms">SMS</option>
+                    <option value="email">Email</option>
+                    <option value="both">Both</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="message">Message:</label>
+                <textarea id="message" placeholder="Enter your alert message here">High temperature detected in greenhouse A1. Current temperature: 40°C. Please check cooling system.</textarea>
+            </div>
+            <div class="form-group">
+                <label for="recipients">Recipients (JSON):</label>
+                <textarea id="recipients" placeholder='[{"phone": "+1234567890"}, {"email": "farmer@example.com"}]'>[{"phone": "+1234567890"}, {"email": "farmer@example.com"}]</textarea>
+            </div>
+            <button onclick="sendNotification()" class="success">📤 Send Notification</button>
+            <div id="notificationResponse" class="response"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Alert Configuration</h2>
+        <button onclick="getAlertConfig()">⚙️ Get Configuration</button>
+        <button onclick="updateAlertConfig()" class="info">⚙️ Update Configuration</button>
+        <button onclick="getAlertHistory()">📜 Get Alert History</button>
+        <button onclick="getAlertStatistics()">📊 Get Statistics</button>
+        <div id="configResponse" class="response"></div>
+    </div>
+
+    <script>
+        function getBaseUrl() {
+            return document.getElementById('baseUrl').value;
+        }
+
+        function getHeaders() {
+            const functionKey = document.getElementById('functionKey').value;
+            if (!functionKey) {
+                alert('Please enter your Function Key');
+                return null;
+            }
+            return {
+                'Content-Type': 'application/json',
+                'x-functions-key': functionKey
+            };
+        }
+
+        function getSiteId() {
+            return document.getElementById('siteId').value;
+        }
+
+        function showResponse(elementId, data, isError = false, isSuccess = false) {
+            const element = document.getElementById(elementId);
+            if (isSuccess) {
+                element.className = 'response success-response';
+            } else if (isError) {
+                element.className = 'response error-response';
+            } else {
+                element.className = 'response';
+            }
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function apiCall(path, method = 'GET', body = null, headers = null) {
+            const url = `${getBaseUrl()}/api${path}`;
+            const requestHeaders = headers || getHeaders();
+            if (!requestHeaders) return;
+
+            try {
+                const options = {
+                    method: method,
+                    headers: requestHeaders
+                };
+
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const response = await fetch(url, options);
+                const data = await response.json();
+                
+                return {
+                    status: response.status,
+                    data: data
+                };
+            } catch (error) {
+                return {
+                    status: 500,
+                    data: { error: error.message }
+                };
+            }
+        }
+
+        // Alert Processing Functions
+        async function processAlert() {
+            const sensorId = document.getElementById('sensorId').value;
+            const sensorValue = parseFloat(document.getElementById('sensorValue').value);
+            const deviceId = document.getElementById('deviceId').value;
+            const siteId = getSiteId();
+
+            const result = await apiCall('/alerts/process', 'POST', {
+                sensorId: sensorId,
+                value: sensorValue,
+                deviceId: deviceId
+            }, {
+                'x-site-id': siteId
+            });
+            
+            showResponse('alertResponse', result.data, !result.data, result.data.shouldNotify);
+        }
+
+        async function batchProcessAlerts() {
+            const siteId = getSiteId();
+            const alerts = [
+                {
+                    sensorId: 'IR1OT',
+                    value: 40,
+                    deviceId: 'BD-BZD'
+                },
+                {
+                    sensorId: 'HM1RH',
+                    value: 85,
+                    deviceId: 'BD-BZD'
+                },
+                {
+                    sensorId: 'SM1SM',
+                    value: 25,
+                    deviceId: 'BD-BZD'
+                }
+            ];
+
+            const result = await apiCall('/alerts/batch', 'POST', {
+                alerts: alerts
+            }, {
+                'x-site-id': siteId
+            });
+            
+            showResponse('alertResponse', result.data, !result.data);
+        }
+
+        // Notification Functions
+        async function sendNotification() {
+            const type = document.getElementById('notificationType').value;
+            const message = document.getElementById('message').value;
+            const recipientsText = document.getElementById('recipients').value;
+            
+            let recipients;
+            try {
+                recipients = JSON.parse(recipientsText);
+            } catch (error) {
+                showResponse('notificationResponse', { error: 'Invalid recipients JSON format' }, true);
+                return;
+            }
+
+            const siteId = getSiteId();
+            const result = await apiCall('/alerts/send', 'POST', {
+                type: type,
+                message: message,
+                recipients: recipients
+            }, {
+                'x-site-id': siteId
+            });
+            
+            showResponse('notificationResponse', result.data, !result.data);
+        }
+
+        // Configuration Functions
+        async function getAlertConfig() {
+            const siteId = getSiteId();
+            const result = await apiCall('/alerts/config', 'GET', null, {
+                'x-site-id': siteId
+            });
+            
+            showResponse('configResponse', result.data, !result.data);
+        }
+
+        async function updateAlertConfig() {
+            const siteId = getSiteId();
+            const newConfig = {
+                temperature: {
+                    high: { threshold: 40, hysteresis: 2, enabled: true },
+                    low: { threshold: 10, hysteresis: 2, enabled: true }
+                },
+                humidity: {
+                    high: { threshold: 85, hysteresis: 5, enabled: true },
+                    low: { threshold: 30, hysteresis: 5, enabled: true }
+                }
+            };
+
+            const result = await apiCall('/alerts/config', 'POST', newConfig, {
+                'x-site-id': siteId
+            });
+            
+            showResponse('configResponse', result.data, !result.data);
+        }
+
+        async function getAlertHistory() {
+            const siteId = getSiteId();
+            const result = await apiCall('/alerts/history', 'GET', null, {
+                'x-site-id': siteId
+            });
+            
+            showResponse('configResponse', result.data, !result.data);
+        }
+
+        async function getAlertStatistics() {
+            const siteId = getSiteId();
+            const result = await apiCall('/alerts/statistics', 'GET', null, {
+                'x-site-id': siteId
+            });
+            
+            showResponse('configResponse', result.data, !result.data);
+        }
+
+        // Auto-refresh alert statistics every 30 seconds
+        setInterval(() => {
+            if (document.getElementById('functionKey').value) {
+                getAlertStatistics();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

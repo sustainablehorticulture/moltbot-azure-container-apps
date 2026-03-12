@@ -1,0 +1,64 @@
+# Azure DevOps Pipeline - Alert System CI/CD
+
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    include:
+    - alerts/*
+    - services/smsService.js
+    - services/emailService.js
+    - services/alertProcessor.js
+    - host.json
+    - package.functions.json
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: 'agricultural-automation-variables'
+  - name: 'functionAppName'
+    value: 'agricultural-alerts-functions'
+
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'
+  displayName: 'Install Node.js'
+
+- task: ArchiveFiles@2
+  displayName: 'Archive Alert Functions'
+  inputs:
+    rootFolderOrFile: '$(Build.SourcesDirectory)'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/alerts-functions.zip'
+    replaceExistingArchive: true
+    include:
+      - alerts/**
+      - services/smsService.js
+      - services/emailService.js
+      - services/alertProcessor.js
+      - host.json
+      - package.functions.json
+      - local.settings.json
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact'
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/alerts-functions.zip'
+    ArtifactName: 'alerts-functions'
+    publishLocation: 'Container'
+
+- task: AzureFunctionApp@1
+  displayName: 'Deploy Alert Functions'
+  inputs:
+    azureSubscription: '$(azureSubscription)'
+    appType: 'functionApp'
+    appName: '$(functionAppName)'
+    package: '$(Build.ArtifactStagingDirectory)/alerts-functions.zip'
+    runtimeStack: 'NODE|18'
+    startUpCommand: 'npm install'
+    deploymentMethod: 'runFromPackage'

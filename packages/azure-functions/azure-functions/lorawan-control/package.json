@@ -1,0 +1,30 @@
+{
+  "name": "lorawan-control-functions",
+  "version": "1.0.0",
+  "description": "Multi-site LoRaWAN device control Azure Functions with privacy isolation",
+  "main": "index.js",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "axios": "^1.6.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "^4.x"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "lorawan",
+    "device-control",
+    "azure-functions",
+    "multi-site",
+    "privacy",
+    "agricultural"
+  ],
+  "author": "Agricultural Automation Team",
+  "license": "MIT"
+}

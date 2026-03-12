@@ -1,0 +1,31 @@
+{
+  "name": "agricultural-alert-system",
+  "version": "1.0.0",
+  "description": "Multi-site agricultural alert system with SMS and email notifications",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "uuid": "^9.0.1",
+    "twilio": "^4.19.0",
+    "@sendgrid/mail": "^7.7.0",
+    "@azure/communication-sms": "^1.0.0",
+    "@azure/communication-email": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "agricultural",
+    "alerts",
+    "notifications",
+    "azure-functions",
+    "multi-site",
+    "privacy",
+    "sms",
+    "email"
+  ],
+  "author": "Agricultural Automation Team",
+  "license": "MIT"
+}

@@ -1,0 +1,44 @@
+name: Deploy LoRaWAN Control Functions
+
+on:
+  push:
+    branches: [ master ]
+    paths: [ 'azure-functions/lorawan-control/**' ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        
+    - name: Install LoRaWAN dependencies
+      run: |
+        cd azure-functions/lorawan-control
+        npm install --production
+        
+    - name: Create LoRaWAN deployment package
+      run: |
+        cd azure-functions/lorawan-control
+        zip -r deploy.zip .
+        
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Deploy LoRaWAN to Azure Functions
+      uses: Azure/functions-action@v1
+      with:
+        app-name: 'backendlorawan-lorawancontrol'
+        package: './azure-functions/lorawan-control/deploy.zip'
+        
+    - name: Logout from Azure
+      run: az logout

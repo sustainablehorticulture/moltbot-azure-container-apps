@@ -1,0 +1,87 @@
+# Azure DevOps CI/CD Pipeline for LoRaWAN Control Functions
+
+trigger:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - azure-functions/lorawan-control/*
+
+pr:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - azure-functions/lorawan-control/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  azureSubscription: 'your-azure-subscription-connection'
+  functionAppName: 'agricultural-lorawan-control'
+  workingDirectory: '$(System.DefaultWorkingDirectory)/azure-functions/lorawan-control'
+
+stages:
+- stage: Build
+  displayName: 'Build and Test LoRaWAN Control Functions'
+  jobs:
+  - job: Build
+    displayName: 'Build LoRaWAN Control'
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+      displayName: 'Install Node.js'
+
+    - script: |
+        cd $(workingDirectory)
+        npm install
+        npm test --if-present
+      displayName: 'Install Dependencies and Test'
+
+    - task: ArchiveFiles@2
+      displayName: 'Archive LoRaWAN Control Functions'
+      inputs:
+        rootFolderOrFile: '$(workingDirectory)'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/lorawan-control.zip'
+        replaceExistingArchive: true
+
+    - publish: '$(Build.ArtifactStagingDirectory)/lorawan-control.zip'
+      artifact: 'lorawan-control-drop'
+      displayName: 'Publish LoRaWAN Control Artifact'
+
+- stage: Deploy
+  displayName: 'Deploy LoRaWAN Control Functions'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployLoRaWAN
+    displayName: 'Deploy to Azure Functions'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: lorawan-control-drop
+            displayName: 'Download LoRaWAN Control Artifact'
+
+          - task: AzureFunctionApp@1
+            displayName: 'Deploy LoRaWAN Control to Azure Functions'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              appType: 'functionApp'
+              appName: '$(functionAppName)'
+              package: '$(Pipeline.Workspace)/lorawan-control-drop/lorawan-control.zip'
+              deploymentMethod: 'runFromPackage'
+
+          - script: |
+              echo "LoRaWAN Control Functions deployed successfully!"
+              echo "Function App: $(functionAppName)"
+              echo "Deployment URL: https://$(functionAppName).azurewebsites.net"
+            displayName: 'Deployment Confirmation'

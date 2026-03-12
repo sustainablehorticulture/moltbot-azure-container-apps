@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoRaWAN Control Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1, h2 {
+            color: #2c3e50;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input, select, button {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 10px;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        button.danger {
+            background-color: #e74c3c;
+        }
+        
+        button.danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .response {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .success {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        
+        .error {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online {
+            background-color: #28a745;
+        }
+        
+        .status-offline {
+            background-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚜 LoRaWAN Control Test Page</h1>
+    
+    <div class="container">
+        <h2>Configuration</h2>
+        <div class="form-group">
+            <label for="baseUrl">Function App URL:</label>
+            <input type="text" id="baseUrl" value="https://agricultural-lorawan-control.azurewebsites.net" placeholder="https://agricultural-lorawan-control.azurewebsites.net">
+        </div>
+        <div class="form-group">
+            <label for="functionKey">Function Key:</label>
+            <input type="password" id="functionKey" placeholder="Your Azure Function key">
+        </div>
+        <div class="form-group">
+            <label for="siteId">Site ID:</label>
+            <input type="text" id="siteId" value="farm-a" placeholder="farm-a">
+        </div>
+        <div class="form-group">
+            <label for="deviceId">Device ID:</label>
+            <input type="text" id="deviceId" value="LT2222-FA-001" placeholder="LT2222-FA-001">
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="container">
+            <h2>Device Management</h2>
+            <button onclick="getDevices()">📱 Get All Devices</button>
+            <button onclick="getDeviceStatus()">🔍 Get Device Status</button>
+            <button onclick="getSchedules()">📅 Get Schedules</button>
+            <div id="deviceResponse" class="response"></div>
+        </div>
+
+        <div class="container">
+            <h2>Relay Control</h2>
+            <div class="form-group">
+                <label for="relayId">Relay ID:</label>
+                <select id="relayId">
+                    <option value="1">Relay 1</option>
+                    <option value="2">Relay 2</option>
+                </select>
+            </div>
+            <button onclick="getRelayStatus()">🔍 Get Relay Status</button>
+            <button onclick="controlRelay(true)" class="success">✅ Turn ON</button>
+            <button onclick="controlRelay(false)" class="danger">❌ Turn OFF</button>
+            <div id="relayResponse" class="response"></div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="container">
+            <h2>Digital I/O Control</h2>
+            <div class="form-group">
+                <label for="pinId">Pin ID:</label>
+                <select id="pinId">
+                    <option value="1">Pin 1</option>
+                    <option value="2">Pin 2</option>
+                    <option value="3">Pin 3</option>
+                    <option value="4">Pin 4</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="pinMode">Pin Mode:</label>
+                <select id="pinMode">
+                    <option value="output">Output</option>
+                    <option value="input">Input</option>
+                    <option value="pullup">Pull-up</option>
+                    <option value="pulldown">Pull-down</option>
+                </select>
+            </div>
+            <button onclick="getDigitalIOStatus()">🔍 Get Digital I/O Status</button>
+            <button onclick="controlDigitalIO(true)" class="success">✅ Set HIGH</button>
+            <button onclick="controlDigitalIO(false)" class="danger">❌ Set LOW</button>
+            <div id="digitalIOResponse" class="response"></div>
+        </div>
+
+        <div class="container">
+            <h2>Batch Operations</h2>
+            <button onclick="batchOperation()">🔧 Run Batch Operation</button>
+            <div id="batchResponse" class="response"></div>
+        </div>
+    </div>
+
+    <script>
+        function getBaseUrl() {
+            return document.getElementById('baseUrl').value;
+        }
+
+        function getHeaders() {
+            const functionKey = document.getElementById('functionKey').value;
+            if (!functionKey) {
+                alert('Please enter your Function Key');
+                return null;
+            }
+            return {
+                'Content-Type': 'application/json',
+                'x-functions-key': functionKey
+            };
+        }
+
+        function getSiteId() {
+            return document.getElementById('siteId').value;
+        }
+
+        function getDeviceId() {
+            return document.getElementById('deviceId').value;
+        }
+
+        function showResponse(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.className = isError ? 'response error' : 'response success';
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function apiCall(path, method = 'GET', body = null) {
+            const url = `${getBaseUrl()}/api${path}`;
+            const headers = getHeaders();
+            if (!headers) return;
+
+            try {
+                const options = {
+                    method: method,
+                    headers: headers
+                };
+
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const response = await fetch(url, options);
+                const data = await response.json();
+                
+                return {
+                    status: response.status,
+                    data: data
+                };
+            } catch (error) {
+                return {
+                    status: 500,
+                    data: { error: error.message }
+                };
+            }
+        }
+
+        // Device Management Functions
+        async function getDevices() {
+            const result = await apiCall(`/sites/${getSiteId()}/devices`);
+            showResponse('deviceResponse', result.data, !result.data);
+        }
+
+        async function getDeviceStatus() {
+            const result = await apiCall(`/sites/${getSiteId()}/status/${getDeviceId()}`);
+            showResponse('deviceResponse', result.data, !result.data);
+        }
+
+        async function getSchedules() {
+            const result = await apiCall(`/sites/${getSiteId()}/schedules`);
+            showResponse('deviceResponse', result.data, !result.data);
+        }
+
+        // Relay Control Functions
+        async function getRelayStatus() {
+            const result = await apiCall(`/sites/${getSiteId()}/relays/${getDeviceId()}`);
+            showResponse('relayResponse', result.data, !result.data);
+        }
+
+        async function controlRelay(state) {
+            const relayId = document.getElementById('relayId').value;
+            const result = await apiCall(`/sites/${getSiteId()}/relays/${getDeviceId()}`, 'POST', {
+                relayId: parseInt(relayId),
+                state: state
+            });
+            showResponse('relayResponse', result.data, !result.data);
+        }
+
+        // Digital I/O Functions
+        async function getDigitalIOStatus() {
+            const result = await apiCall(`/sites/${getSiteId()}/digital/${getDeviceId()}`);
+            showResponse('digitalIOResponse', result.data, !result.data);
+        }
+
+        async function controlDigitalIO(state) {
+            const pinId = document.getElementById('pinId').value;
+            const mode = document.getElementById('pinMode').value;
+            const result = await apiCall(`/sites/${getSiteId()}/digital/${getDeviceId()}`, 'POST', {
+                pinId: parseInt(pinId),
+                state: state,
+                mode: mode
+            });
+            showResponse('digitalIOResponse', result.data, !result.data);
+        }
+
+        // Batch Operations
+        async function batchOperation() {
+            const operations = [
+                {
+                    type: 'relay',
+                    deviceId: getDeviceId(),
+                    relayId: 1,
+                    state: true
+                },
+                {
+                    type: 'digital',
+                    deviceId: getDeviceId(),
+                    pinId: 3,
+                    state: false,
+                    mode: 'output'
+                }
+            ];
+
+            const result = await apiCall(`/sites/${getSiteId()}/batch`, 'POST', {
+                operations: operations
+            });
+            showResponse('batchResponse', result.data, !result.data);
+        }
+
+        // Auto-refresh device status every 30 seconds
+        setInterval(() => {
+            if (document.getElementById('functionKey').value) {
+                getDeviceStatus();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
