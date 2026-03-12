@@ -1,7 +1,7 @@
 {
   "_comment": "Provider registry for Red Dog sensor API client. APIM base URL: https://reddog.azure-api.net. Key Vault secret names must match secrets stored in each farm's Azure Key Vault.",
 
-  "apimBaseUrl": "https://reddog.azure-api.net",
+  "apimBaseUrl": "https://agenticagapi.azure-api.net",
 
   "providers": {
 
