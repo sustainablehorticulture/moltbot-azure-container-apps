@@ -9,6 +9,8 @@ const ServiceBusManager = require('./service-bus-client');
 const DataApprovalManager = require('./data-approval-manager');
 const SocialMediaManager = require('./social-media-manager');
 const AgentCommunicationManager = require('./agent-communication');
+const FunctionsClient = require('./functions-client');
+const DeviceCommands = require('./device-commands');
 
 async function main() {
     console.log('=== Red Dog Starting ===');
@@ -94,20 +96,26 @@ async function main() {
         apiUrl: `http://localhost:${process.env.API_PORT || 3001}`
     });
 
-    // 7. Initialize AI engine with database, billing, blob storage, and approval manager
+    // 7. Initialize Azure Functions client and device commands
+    console.log('Initializing device control...');
+    const functionsClient = new FunctionsClient();
+    const deviceCommands = new DeviceCommands({ functionsClient });
+    console.log('Device Control:', functionsClient.enabled ? `Connected (${functionsClient.baseUrl})` : 'Disabled (set AZURE_FUNCTIONS_URL + AZURE_FUNCTIONS_KEY)');
+
+    // 8. Initialize AI engine
     console.log('Initializing AI engine...');
-    const ai = new AIEngine(db, billing, blobStorage, serviceBus, approvalManager);
+    const ai = new AIEngine(db, billing, blobStorage, serviceBus, approvalManager, deviceCommands);
     if (db.isConnected) {
         console.log('Caching database schema (this may take a moment)...');
         await ai.cacheSchema();
     }
 
-    // 8. Start API server
+    // 9. Start API server
     console.log('Starting API server...');
-    const api = new APIServer(ai, db, blobStorage, serviceBus, approvalManager, socialMedia);
+    const api = new APIServer(ai, db, blobStorage, serviceBus, approvalManager, socialMedia, deviceCommands);
     await api.start();
 
-    // 9. Initialize agent communication manager
+    // 10. Initialize agent communication manager
     console.log('Initializing agent communication...');
     const discord = new DiscordClient(ai);
     const agentComm = new AgentCommunicationManager({
@@ -118,7 +126,7 @@ async function main() {
     // Set agent communication in Discord client
     discord.agentComm = agentComm;
 
-    // 10. Start Discord client (optional — runs alongside API)
+    // 11. Start Discord client (optional — runs alongside API)
     console.log('Starting Discord client...');
     await discord.start();
 
@@ -131,6 +139,8 @@ async function main() {
     console.log(`Billing:      ${billing.getStatus().stripeConfigured ? 'Stripe configured' : 'Stripe not configured'}`);
     console.log(`Social Media: Instagram, Facebook, LinkedIn`);
     console.log(`Agent Comms:  ${agentComm.getStatus().serviceBusConnected ? 'Trevor, Daisy Bell' : 'Disabled'}`);
+    console.log(`Device Control: ${functionsClient.enabled ? 'LoRaWAN + WattWatchers' : 'Disabled'}`);
+    console.log(`Twilio SMS:   ${process.env.TWILIO_ACCOUNT_SID ? 'Configured (webhook: /api/twilio/sms)' : 'Disabled'}`);
 
     // Graceful shutdown
     const shutdown = async () => {

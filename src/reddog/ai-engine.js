@@ -5,12 +5,13 @@ const TopicManager = require('./topic-manager');
 const KnowledgeGraph = require('./knowledge-graph');
 
 class AIEngine {
-    constructor(db, billing = null, blobStorage = null, serviceBus = null, approvalManager = null) {
+    constructor(db, billing = null, blobStorage = null, serviceBus = null, approvalManager = null, deviceCommands = null) {
         this.db = db;
         this.billing = billing;
         this.blobStorage = blobStorage;
         this.serviceBus = serviceBus;
         this.approvalManager = approvalManager;
+        this.deviceCommands = deviceCommands;
         this.schemaCache = null;
         this.model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
         this.apiKey = process.env.OPENROUTER_API_KEY;
@@ -205,7 +206,21 @@ Rules for SQL queries:
 - Be precise with column names based on the schema below
 - If a database is marked as having no tables, do NOT generate a query for it. Just explain that the database is empty.
 
-If the question does NOT need a database query, just respond normally in plain text with your Red Dog personality.`;
+If the question does NOT need a database query, just respond normally in plain text with your Red Dog personality.
+
+When the user asks to CONTROL a device (turn on/off a relay, open/close a switch, check device status), respond with a JSON block:
+{"action": "device_control", "device_type": "<type>", "device_id": "<id>", ...}
+
+Device types and required fields:
+- lorawan_relay: device_id, relay_id (1 or 2), state (true=ON, false=OFF)
+- lorawan_digital: device_id, pin_id (1-4), state (true=HIGH, false=LOW), mode (optional: "output")
+- wattwatchers_switch: device_id, switch_id (e.g. "S1"), state ("open" or "closed"), site_id (optional)
+- lorawan_status: device_id (get device status)
+- lorawan_devices: (list all LoRaWAN devices)
+- wattwatchers_status: device_id (get switch status)
+- wattwatchers_energy: device_id (get latest energy data)
+
+IMPORTANT: Never emit device_control JSON for queries — only for actual control commands or status reads.`;
 
         // Add topic awareness
         if (this.topicManager) {
@@ -261,6 +276,16 @@ If the question does NOT need a database query, just respond normally in plain t
                 return { reply: "No worries, mate — slate's clean! What's next?" };
             }
 
+            // Handle device command confirmations (yes/no replies)
+            if (this.deviceCommands && this.deviceCommands.isConfirmation(userMessage)) {
+                const confirmation = await this.deviceCommands.resolveConfirmation(userId, userMessage);
+                if (confirmation.reply !== null) {
+                    await this.addToHistory(userId, 'user', userMessage);
+                    await this.addToHistory(userId, 'assistant', confirmation.reply);
+                    return { reply: confirmation.reply };
+                }
+            }
+
             // Handle topic list request
             if (this.topicManager && this.topicManager.isTopicListRequest(userMessage)) {
                 const topicList = this.topicManager.formatTopicsForDisplay();
@@ -314,7 +339,26 @@ If the question does NOT need a database query, just respond normally in plain t
 
             const aiReply = firstResponse.data.choices[0].message.content;
 
-            // Step 2: Check if AI wants to run a query
+            // Step 2a: Check if AI wants to control a device
+            if (this.deviceCommands) {
+                const deviceAction = this.deviceCommands.parseDeviceAction(aiReply);
+                if (deviceAction) {
+                    // Read-only status queries execute immediately, control commands need confirmation
+                    if (this.deviceCommands.isReadOnlyAction(deviceAction)) {
+                        const result = await this.deviceCommands.executeCommand(deviceAction);
+                        await this.addToHistory(userId, 'user', userMessage);
+                        await this.addToHistory(userId, 'assistant', result.reply);
+                        return { reply: result.reply, deviceAction };
+                    } else {
+                        const confirmMsg = await this.deviceCommands.requestConfirmation(deviceAction, userId);
+                        await this.addToHistory(userId, 'user', userMessage);
+                        await this.addToHistory(userId, 'assistant', confirmMsg);
+                        return { reply: confirmMsg, deviceAction, awaitingConfirmation: true };
+                    }
+                }
+            }
+
+            // Step 2b: Check if AI wants to run a query
             const queryMatch = aiReply.match(/\{[\s\S]*?"action"\s*:\s*"query"[\s\S]*?\}/);
             if (queryMatch && this.db && this.db.isConnected) {
                 try {

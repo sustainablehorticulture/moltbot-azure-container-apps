@@ -3,13 +3,14 @@ const cors = require('cors');
 const BillingSystem = require('./billing-system');
 
 class APIServer {
-    constructor(aiEngine, db, blobStorage, serviceBus, approvalManager, socialMedia) {
+    constructor(aiEngine, db, blobStorage, serviceBus, approvalManager, socialMedia, deviceCommands = null) {
         this.aiEngine = aiEngine;
         this.db = db;
         this.blobStorage = blobStorage;
         this.serviceBus = serviceBus;
         this.approvalManager = approvalManager;
         this.socialMedia = socialMedia;
+        this.deviceCommands = deviceCommands;
         this.billing = new BillingSystem({ db });
         this.app = express();
         this.port = process.env.API_PORT || process.env.GATEWAY_PORT || 3001;
@@ -37,6 +38,85 @@ class APIServer {
         if (this.socialMedia) {
             const socialMediaRoutes = require('./routes/social-media')(this.socialMedia);
             this.app.use('/api/social', socialMediaRoutes);
+        }
+
+        // Twilio SMS webhook — receives YES/NO replies for device command confirmation
+        this.app.post('/api/twilio/sms', express.urlencoded({ extended: false }), async (req, res) => {
+            try {
+                const from = req.body.From;  // e.g. +61467413589
+                const body = (req.body.Body || '').trim();
+                console.log(`[Twilio] SMS from ${from}: ${body}`);
+
+                const twiml = '<?xml version="1.0" encoding="UTF-8"?><Response>';
+
+                if (this.deviceCommands) {
+                    const result = await this.deviceCommands.resolveSMSConfirmation(from, body);
+                    if (result) {
+                        // SMS response already sent by DeviceCommands — just acknowledge
+                        return res.type('text/xml').send(`${twiml}</Response>`);
+                    }
+                }
+
+                // No pending action found
+                res.type('text/xml').send(`${twiml}<Message>Red Dog here! No pending command to confirm. Send a command via Red Dog chat first.</Message></Response>`);
+            } catch (error) {
+                console.error('[Twilio] Webhook error:', error.message);
+                res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Message>Red Dog encountered an error processing your reply.</Message></Response>');
+            }
+        });
+
+        // Device control routes (direct API access)
+        if (this.deviceCommands && this.deviceCommands.functions && this.deviceCommands.functions.enabled) {
+            this.app.get('/api/devices/lorawan', async (req, res) => {
+                try {
+                    const data = await this.deviceCommands.functions.getLoRaWANDevices();
+                    res.json(data);
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            this.app.get('/api/devices/lorawan/:deviceId/status', async (req, res) => {
+                try {
+                    const data = await this.deviceCommands.functions.getLoRaWANStatus(req.params.deviceId);
+                    res.json(data);
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            this.app.get('/api/devices/lorawan/:deviceId/relay', async (req, res) => {
+                try {
+                    const data = await this.deviceCommands.functions.getRelayStatus(req.params.deviceId);
+                    res.json(data);
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            this.app.post('/api/devices/lorawan/:deviceId/relay', async (req, res) => {
+                try {
+                    const { relayId, state } = req.body;
+                    const data = await this.deviceCommands.functions.controlRelay(req.params.deviceId, relayId, state);
+                    res.json(data);
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            this.app.get('/api/devices/wattwatchers/:deviceId/switches', async (req, res) => {
+                try {
+                    const data = await this.deviceCommands.functions.getSwitchStatus(req.params.deviceId, req.query.siteId);
+                    res.json(data);
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            this.app.patch('/api/devices/wattwatchers/:deviceId/switches', async (req, res) => {
+                try {
+                    const { switchId, state, siteId } = req.body;
+                    const data = await this.deviceCommands.functions.controlSwitch(req.params.deviceId, switchId, state, siteId);
+                    res.json(data);
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            this.app.get('/api/devices/wattwatchers/:deviceId/energy', async (req, res) => {
+                try {
+                    const data = await this.deviceCommands.functions.getEnergyLatest(req.params.deviceId, req.query.siteId);
+                    res.json(data);
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
         }
 
         // Chat endpoint — send a message, get an AI response (with optional DB queries)
