@@ -64,9 +64,13 @@ class BillingSystem {
         try {
             // Use zerosumag database with reddog schema
             await this.db.query(`
-                INSERT INTO [reddog].[BillingAccounts] 
-                (UserOid, UserEmail, UserName, Plan, Credits, Status, CreatedAt, UpdatedAt)
-                VALUES (@UserOid, @UserEmail, @UserName, @Plan, @Credits, 'active', GETUTCDATE(), GETUTCDATE())
+                MERGE [reddog].[BillingAccounts] AS target
+                USING (SELECT @UserOid AS UserOid) AS source ON target.UserOid = source.UserOid
+                WHEN MATCHED THEN
+                    UPDATE SET UserEmail=@UserEmail, UserName=@UserName, [Plan]=@Plan, Credits=@Credits, Status='active', UpdatedAt=GETUTCDATE()
+                WHEN NOT MATCHED THEN
+                    INSERT (UserOid, UserEmail, UserName, [Plan], Credits, Status, CreatedAt, UpdatedAt)
+                    VALUES (@UserOid, @UserEmail, @UserName, @Plan, @Credits, 'active', GETUTCDATE(), GETUTCDATE());
             `, [
                 { name: 'UserOid', value: userOid },
                 { name: 'UserEmail', value: userEmail },
@@ -166,18 +170,25 @@ class BillingSystem {
                 UPDATE [reddog].[BillingAccounts]
                 SET Credits = Credits - @Credits, UpdatedAt = GETUTCDATE()
                 WHERE UserOid = @UserOid;
-
-                INSERT INTO [reddog].[CreditTransactions]
-                (UserOid, Amount, Operation, BalanceBefore, BalanceAfter, Metadata, Timestamp)
-                SELECT @UserOid, @Credits, @Operation, Credits - @Credits, Credits - @Credits, @Metadata, GETUTCDATE()
-                FROM [reddog].[BillingAccounts]
-                WHERE UserOid = @UserOid;
             `, [
                 { name: 'UserOid', value: userOid },
-                { name: 'Credits', value: creditsToConsume },
-                { name: 'Operation', value: operation },
-                { name: 'Metadata', value: JSON.stringify(metadata) }
+                { name: 'Credits', value: creditsToConsume }
             ], 'zerosumag');
+
+            // Audit log — optional, table may not exist yet
+            try {
+                await this.db.query(`
+                    INSERT INTO [reddog].[CreditTransactions]
+                    (UserOid, Amount, Operation, BalanceBefore, BalanceAfter, Metadata, Timestamp)
+                    SELECT @UserOid, @Credits, @Operation, Credits, Credits + @Credits, @Metadata, GETUTCDATE()
+                    FROM [reddog].[BillingAccounts] WHERE UserOid = @UserOid;
+                `, [
+                    { name: 'UserOid', value: userOid },
+                    { name: 'Credits', value: creditsToConsume },
+                    { name: 'Operation', value: operation },
+                    { name: 'Metadata', value: JSON.stringify(metadata) }
+                ], 'zerosumag');
+            } catch (_) { /* CreditTransactions table not provisioned yet */ }
 
             // Invalidate cache
             this.creditCache.delete(`credits:${userOid}`);
@@ -196,18 +207,24 @@ class BillingSystem {
                 UPDATE [reddog].[BillingAccounts]
                 SET Credits = Credits + @Credits, UpdatedAt = GETUTCDATE()
                 WHERE UserOid = @UserOid;
-
-                INSERT INTO [reddog].[CreditTransactions]
-                (UserOid, Amount, Operation, BalanceBefore, BalanceAfter, Metadata, Timestamp)
-                SELECT @UserOid, @Credits, 'credit_added', Credits, Credits + @Credits, @Metadata, GETUTCDATE()
-                FROM [reddog].[BillingAccounts]
-                WHERE UserOid = @UserOid;
             `, [
                 { name: 'UserOid', value: userOid },
-                { name: 'Credits', value: credits },
-                { name: 'Source', value: source },
-                { name: 'Metadata', value: JSON.stringify(metadata) }
+                { name: 'Credits', value: credits }
             ], 'zerosumag');
+
+            // Audit log — optional, table may not exist yet
+            try {
+                await this.db.query(`
+                    INSERT INTO [reddog].[CreditTransactions]
+                    (UserOid, Amount, Operation, BalanceBefore, BalanceAfter, Metadata, Timestamp)
+                    SELECT @UserOid, @Credits, 'credit_added', Credits, Credits + @Credits, @Metadata, GETUTCDATE()
+                    FROM [reddog].[BillingAccounts] WHERE UserOid = @UserOid;
+                `, [
+                    { name: 'UserOid', value: userOid },
+                    { name: 'Credits', value: credits },
+                    { name: 'Metadata', value: JSON.stringify(metadata) }
+                ], 'zerosumag');
+            } catch (_) { /* CreditTransactions table not provisioned yet */ }
 
             // Invalidate cache
             this.creditCache.delete(`credits:${userOid}`);

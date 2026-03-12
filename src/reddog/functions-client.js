@@ -5,6 +5,7 @@ class FunctionsClient {
         this.baseUrl = (process.env.AZURE_FUNCTIONS_URL || '').replace(/\/$/, '');
         this.functionKey = process.env.AZURE_FUNCTIONS_KEY;
         this.siteId = process.env.WATTWATCHERS_SITE_ID || 'default';
+        this.lorawanSiteId = process.env.LORAWAN_APPLICATION_ID || process.env.FARM_ID || 'default';
         this.enabled = !!(this.baseUrl && this.functionKey);
 
         if (this.enabled) {
@@ -28,7 +29,7 @@ class FunctionsClient {
         try {
             const response = await axios({
                 method,
-                url: `${this.baseUrl}/${path}`,
+                url: `${this.baseUrl}/api/${path}`,
                 headers: this.getHeaders(),
                 data: body || undefined,
                 timeout: 15000
@@ -43,25 +44,25 @@ class FunctionsClient {
     // ── LoRaWAN Device Management ────────────────────────────────────────
 
     async getLoRaWANDevices() {
-        return this.request('get', 'lorawan/device');
+        return this.request('get', `sites/${this.lorawanSiteId}/devices`);
     }
 
     async getLoRaWANDevice(deviceId) {
-        return this.request('get', `lorawan/device/${deviceId}`);
+        return this.request('get', `sites/${this.lorawanSiteId}/devices/${deviceId}`);
     }
 
     async getLoRaWANStatus(deviceId) {
-        return this.request('get', `lorawan/status/${deviceId}`);
+        return this.request('get', `sites/${this.lorawanSiteId}/status/${deviceId}`);
     }
 
     // ── LoRaWAN Relay Control ────────────────────────────────────────────
 
     async getRelayStatus(deviceId) {
-        return this.request('get', `lorawan/relay/${deviceId}`);
+        return this.request('get', `sites/${this.lorawanSiteId}/relays/${deviceId}`);
     }
 
     async controlRelay(deviceId, relayId, state) {
-        return this.request('post', `lorawan/relay/${deviceId}`, {
+        return this.request('post', `sites/${this.lorawanSiteId}/relays/${deviceId}`, {
             relayId: parseInt(relayId),
             state: Boolean(state)
         });
@@ -70,11 +71,11 @@ class FunctionsClient {
     // ── LoRaWAN Digital I/O Control ──────────────────────────────────────
 
     async getDigitalIOStatus(deviceId) {
-        return this.request('get', `lorawan/digital/${deviceId}`);
+        return this.request('get', `sites/${this.lorawanSiteId}/digital/${deviceId}`);
     }
 
     async controlDigitalIO(deviceId, pinId, state, mode = 'output') {
-        return this.request('post', `lorawan/digital/${deviceId}`, {
+        return this.request('post', `sites/${this.lorawanSiteId}/digital/${deviceId}`, {
             pinId: parseInt(pinId),
             state: Boolean(state),
             mode

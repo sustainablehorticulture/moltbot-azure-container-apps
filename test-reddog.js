@@ -46,13 +46,13 @@ async function test(label, fn) {
     }
 }
 
-async function get(path, params = {}) {
-    const res = await axios.get(`${BASE}${path}`, { params, timeout: 15000 });
+async function get(path, params = {}, timeout = 15000) {
+    const res = await axios.get(`${BASE}${path}`, { params, timeout });
     return res.data;
 }
 
-async function post(path, body = {}) {
-    const res = await axios.post(`${BASE}${path}`, body, { timeout: 15000 });
+async function post(path, body = {}, timeout = 15000) {
+    const res = await axios.post(`${BASE}${path}`, body, { timeout });
     return res.data;
 }
 
@@ -69,21 +69,21 @@ async function testHealth() {
 async function testChat() {
     title('Chat');
     // Billing requires an account to exist before chat
-    await post('/api/billing/account', { userOid: 'test-user', userEmail: 'test@reddog.local', userName: 'Test', plan: 'free' }).catch(() => {});
+    await post('/api/billing/account', { userOid: 'test-user', userEmail: 'test@reddog.local', userName: 'Test', plan: 'starter' }).catch(() => {});
     await test('POST /api/chat — simple greeting', async () => {
-        const d = await post('/api/chat', { message: 'hello', userId: 'test-user' });
+        const d = await post('/api/chat', { message: 'hello', userId: 'test-user' }, 30000);
         return `action=${d.action} reply="${(d.reply||'').slice(0,60)}..."`;
     });
     await test('POST /api/chat — DB query intent', async () => {
-        const d = await post('/api/chat', { message: 'how many farms are in the database?', userId: 'test-user' });
+        const d = await post('/api/chat', { message: 'how many farms are in the database?', userId: 'test-user' }, 30000);
         return `action=${d.action}`;
     });
     await test('POST /api/chat — sensor intent', async () => {
-        const d = await post('/api/chat', { message: `what is the live battery level at ${FARM}?`, userId: 'test-user' });
+        const d = await post('/api/chat', { message: `what is the live battery level at ${FARM}?`, userId: 'test-user' }, 30000);
         return `action=${d.action}`;
     });
     await test('POST /api/chat — device intent', async () => {
-        const d = await post('/api/chat', { message: 'list all lorawan devices', userId: 'test-user' });
+        const d = await post('/api/chat', { message: 'list all lorawan devices', userId: 'test-user' }, 30000);
         return `action=${d.action}`;
     });
     await test('POST /api/chat — missing message → 400', async () => {

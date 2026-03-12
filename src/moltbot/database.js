@@ -142,8 +142,13 @@ class DatabaseManager {
             const request = pool.request();
             
             // Add parameters if provided
+            // Supports both named objects { name, value } and positional scalars
             params.forEach((param, index) => {
-                request.input(`param${index}`, param);
+                if (param && typeof param === 'object' && 'name' in param && 'value' in param) {
+                    request.input(param.name, param.value);
+                } else {
+                    request.input(`param${index}`, param);
+                }
             });
 
             const result = await request.query(sqlQuery);
