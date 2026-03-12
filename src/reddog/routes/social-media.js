@@ -223,5 +223,92 @@ module.exports = (socialMedia) => {
         }
     });
 
+    // ─── WhatsApp Business Messaging ───
+
+    /**
+     * POST /api/social/whatsapp/send
+     * Send a plain text WhatsApp message
+     * Body: { to, text }
+     */
+    router.post('/whatsapp/send', async (req, res) => {
+        const { to, text } = req.body;
+        if (!to || !text) {
+            return res.status(400).json({ error: 'to and text are required' });
+        }
+        try {
+            const result = await socialMedia.sendWhatsAppMessage(to, text);
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    /**
+     * POST /api/social/whatsapp/media
+     * Send a WhatsApp image, video, document, or audio message
+     * Body: { to, type, mediaUrl, caption }
+     */
+    router.post('/whatsapp/media', async (req, res) => {
+        const { to, type, mediaUrl, caption } = req.body;
+        if (!to || !mediaUrl) {
+            return res.status(400).json({ error: 'to and mediaUrl are required' });
+        }
+        try {
+            const result = await socialMedia.sendWhatsAppMedia(to, { type, mediaUrl, caption });
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    /**
+     * POST /api/social/whatsapp/template
+     * Send a pre-approved WhatsApp template message (for marketing/outbound)
+     * Body: { to, templateName, languageCode, components }
+     */
+    router.post('/whatsapp/template', async (req, res) => {
+        const { to, templateName, languageCode, components } = req.body;
+        if (!to || !templateName) {
+            return res.status(400).json({ error: 'to and templateName are required' });
+        }
+        try {
+            const result = await socialMedia.sendWhatsAppTemplate(to, templateName, languageCode, components);
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    /**
+     * POST /api/social/whatsapp/broadcast
+     * Send a WhatsApp message to multiple recipients
+     * Body: { recipients: ["+61400000000", ...], text }
+     */
+    router.post('/whatsapp/broadcast', async (req, res) => {
+        const { recipients, text } = req.body;
+        if (!recipients || !Array.isArray(recipients) || !text) {
+            return res.status(400).json({ error: 'recipients (array) and text are required' });
+        }
+        try {
+            const result = await socialMedia.broadcastWhatsApp(recipients, text);
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    /**
+     * GET /api/social/whatsapp/status
+     * Check if WhatsApp Business API is configured
+     */
+    router.get('/whatsapp/status', (req, res) => {
+        res.json({
+            configured: !!(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
+            phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ? '✓ Set' : '✗ Missing',
+            accessToken: process.env.WHATSAPP_ACCESS_TOKEN ? '✓ Set' : '✗ Missing',
+            businessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ? '✓ Set' : '✗ Missing'
+        });
+    });
+
     return router;
 };

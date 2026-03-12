@@ -44,6 +44,13 @@ class SocialMediaManager {
                 tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
                 apiUrl: 'https://api.linkedin.com/v2',
                 scopes: ['w_member_social', 'r_basicprofile', 'r_organization_social']
+            },
+            whatsapp: {
+                name: 'WhatsApp',
+                apiUrl: 'https://graph.facebook.com/v18.0',
+                // WhatsApp uses a static system user token, not OAuth
+                // Token set via WHATSAPP_ACCESS_TOKEN env var
+                noOAuth: true
             }
         };
 
@@ -418,6 +425,157 @@ class SocialMediaManager {
             console.error('[SocialMedia] Facebook ad creation failed:', error.message);
             throw error;
         }
+    }
+
+    // ─── WhatsApp Business Messaging ───
+
+    getWhatsAppToken() {
+        const token = process.env.WHATSAPP_ACCESS_TOKEN;
+        if (!token) throw new Error('WHATSAPP_ACCESS_TOKEN not configured');
+        return token;
+    }
+
+    getWhatsAppPhoneNumberId() {
+        const id = process.env.WHATSAPP_PHONE_NUMBER_ID;
+        if (!id) throw new Error('WHATSAPP_PHONE_NUMBER_ID not configured');
+        return id;
+    }
+
+    /**
+     * Send a plain text WhatsApp message
+     */
+    async sendWhatsAppMessage(to, text) {
+        const token = this.getWhatsAppToken();
+        const phoneNumberId = this.getWhatsAppPhoneNumberId();
+
+        try {
+            const response = await axios.post(
+                `${this.platforms.whatsapp.apiUrl}/${phoneNumberId}/messages`,
+                {
+                    messaging_product: 'whatsapp',
+                    recipient_type: 'individual',
+                    to: to.replace(/[^0-9]/g, ''), // strip non-digits
+                    type: 'text',
+                    text: { body: text }
+                },
+                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+            );
+
+            console.log(`[SocialMedia] WhatsApp message sent to ${to}: ${response.data.messages[0]?.id}`);
+            return {
+                success: true,
+                platform: 'whatsapp',
+                messageId: response.data.messages[0]?.id,
+                to,
+                message: 'WhatsApp message sent successfully!'
+            };
+        } catch (error) {
+            const msg = error.response?.data?.error?.message || error.message;
+            console.error('[SocialMedia] WhatsApp message failed:', msg);
+            throw new Error(`WhatsApp send failed: ${msg}`);
+        }
+    }
+
+    /**
+     * Send a WhatsApp message with image, video, or document
+     */
+    async sendWhatsAppMedia(to, { type = 'image', mediaUrl, caption = '' }) {
+        const token = this.getWhatsAppToken();
+        const phoneNumberId = this.getWhatsAppPhoneNumberId();
+
+        const validTypes = ['image', 'video', 'document', 'audio'];
+        if (!validTypes.includes(type)) {
+            throw new Error(`Invalid media type. Use: ${validTypes.join(', ')}`);
+        }
+
+        const mediaPayload = { link: mediaUrl };
+        if (caption && type !== 'audio') mediaPayload.caption = caption;
+
+        try {
+            const response = await axios.post(
+                `${this.platforms.whatsapp.apiUrl}/${phoneNumberId}/messages`,
+                {
+                    messaging_product: 'whatsapp',
+                    recipient_type: 'individual',
+                    to: to.replace(/[^0-9]/g, ''),
+                    type,
+                    [type]: mediaPayload
+                },
+                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+            );
+
+            console.log(`[SocialMedia] WhatsApp ${type} sent to ${to}: ${response.data.messages[0]?.id}`);
+            return {
+                success: true,
+                platform: 'whatsapp',
+                messageId: response.data.messages[0]?.id,
+                to,
+                type,
+                message: `WhatsApp ${type} sent successfully!`
+            };
+        } catch (error) {
+            const msg = error.response?.data?.error?.message || error.message;
+            throw new Error(`WhatsApp media send failed: ${msg}`);
+        }
+    }
+
+    /**
+     * Send a pre-approved WhatsApp template message (required for outbound marketing)
+     * templateName: your approved template name (e.g. 'farm_alert', 'weekly_update')
+     * languageCode: e.g. 'en_AU', 'en_US'
+     * components: array of template parameter components
+     */
+    async sendWhatsAppTemplate(to, templateName, languageCode = 'en_AU', components = []) {
+        const token = this.getWhatsAppToken();
+        const phoneNumberId = this.getWhatsAppPhoneNumberId();
+
+        try {
+            const response = await axios.post(
+                `${this.platforms.whatsapp.apiUrl}/${phoneNumberId}/messages`,
+                {
+                    messaging_product: 'whatsapp',
+                    to: to.replace(/[^0-9]/g, ''),
+                    type: 'template',
+                    template: {
+                        name: templateName,
+                        language: { code: languageCode },
+                        ...(components.length ? { components } : {})
+                    }
+                },
+                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+            );
+
+            console.log(`[SocialMedia] WhatsApp template '${templateName}' sent to ${to}`);
+            return {
+                success: true,
+                platform: 'whatsapp',
+                messageId: response.data.messages[0]?.id,
+                to,
+                template: templateName,
+                message: `WhatsApp template '${templateName}' sent successfully!`
+            };
+        } catch (error) {
+            const msg = error.response?.data?.error?.message || error.message;
+            throw new Error(`WhatsApp template send failed: ${msg}`);
+        }
+    }
+
+    /**
+     * Broadcast a WhatsApp message to multiple recipients
+     */
+    async broadcastWhatsApp(recipients, text) {
+        const results = [];
+        for (const to of recipients) {
+            try {
+                const result = await this.sendWhatsAppMessage(to, text);
+                results.push(result);
+            } catch (error) {
+                results.push({ success: false, to, error: error.message });
+            }
+        }
+        const succeeded = results.filter(r => r.success).length;
+        console.log(`[SocialMedia] WhatsApp broadcast: ${succeeded}/${recipients.length} sent`);
+        return { success: true, platform: 'whatsapp', sent: succeeded, total: recipients.length, results };
     }
 
     // ─── LinkedIn Posting ───
