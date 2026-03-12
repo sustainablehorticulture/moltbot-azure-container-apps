@@ -145,7 +145,7 @@ async function main() {
     console.log(`API:          http://localhost:${process.env.API_PORT || 3001}`);
     console.log(`Discord:      ${process.env.DISCORD_BOT_TOKEN ? 'Connected' : 'Disabled (no token)'}`);
     console.log(`Database:     ${db.isConnected ? Object.keys(db.pools).join(', ') : 'Disabled'}`);
-    console.log(`Blob Storage: ${blobStorage.isConnected ? blobStorage.containerName : 'Disabled'}`);
+    console.log(`Blob Storage: ${blobStorage.isConnected ? blobStorage.currentContainerName : 'Disabled'}`);
     console.log(`Service Bus:  ${serviceBus.isConnected ? serviceBus.topicName : 'Disabled'}`);
     console.log(`Billing:      ${billing.getStatus().stripeConfigured ? 'Stripe configured' : 'Stripe not configured'}`);
     console.log(`Social Media: Instagram, Facebook, LinkedIn`);

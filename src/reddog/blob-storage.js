@@ -37,9 +37,7 @@ class BlobStorageManager {
             this.containerClient = this.blobServiceClient.getContainerClient(this.currentContainerName);
             
             // Create default container if it doesn't exist
-            await this.containerClient.createIfNotExists({
-                access: 'private'
-            });
+            await this.containerClient.createIfNotExists();
             
             // Cache the default container client
             this.containerClients.set(this.currentContainerName, this.containerClient);
@@ -537,7 +535,7 @@ class BlobStorageManager {
             // Create container if it doesn't exist
             if (!client) {
                 const newClient = this.blobServiceClient.getContainerClient(chatContainer);
-                await newClient.createIfNotExists({ access: 'private' });
+                await newClient.createIfNotExists();
                 this.containerClients.set(chatContainer, newClient);
                 client = newClient;
             }
