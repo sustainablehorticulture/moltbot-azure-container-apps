@@ -23,9 +23,16 @@ const FarmConfig = require('./farm-config');
 const KeyVaultClient = require('./keyvault-client');
 
 class SensorAPIClient {
-    constructor(db) {
+    /**
+     * @param {object} db         - database client
+     * @param {object} agentComm  - AgentCommunicationManager (optional)
+     *   When provided, auth tokens are requested from Trevor Tractor via Service Bus.
+     *   Falls back to direct Key Vault lookup if Trevor is unavailable.
+     */
+    constructor(db, agentComm = null) {
         this.farmConfig = new FarmConfig(db);
         this.keyVault = new KeyVaultClient();
+        this.agentComm = agentComm;
         this.apimBaseUrl = (process.env.SENSOR_APIM_URL || '').replace(/\/$/, '');
         this.apimKey = process.env.SENSOR_APIM_KEY;
         this.enabled = !!(this.apimBaseUrl);
@@ -94,11 +101,42 @@ class SensorAPIClient {
     // ── Internal helpers ───────────────────────────────────────────────────
 
     /**
-     * Get the API key for a specific provider from the farm's Key Vault.
-     * Each provider has its own secret (e.g. 'selectronic-api-key', 'weather-api-key').
-     * Falls back to 'sensor-api-key' if provider-specific secret not found.
+     * Build authenticated headers for an APIM call.
+     *
+     * Auth priority:
+     *   1. Trevor Tractor (via Service Bus) — returns token + optional extra headers
+     *   2. Direct Key Vault lookup (fallback when Trevor unavailable)
+     *
+     * Trevor response shape:
+     *   { token, tokenType: 'Bearer'|'ApiKey', headers: { 'X-PIPER-KEY': '...' }, expiresIn }
      */
-    async _getFarmApiKey(farmName, providerId = null) {
+    async _getAuthHeaders(farmName, providerId = null) {
+        const base = {
+            'X-Farm-Name': farmName,
+            'X-Site-Id': farmName
+        };
+        if (this.apimKey) base['Ocp-Apim-Subscription-Key'] = this.apimKey;
+        if (providerId) base['X-Provider'] = providerId;
+
+        // 1. Try Trevor Tractor for auth
+        if (this.agentComm) {
+            const tokenData = await this.agentComm.requestAuthToken(farmName, providerId || 'default');
+            if (tokenData) {
+                if (tokenData.tokenType === 'Bearer' && tokenData.token) {
+                    base['Authorization'] = `Bearer ${tokenData.token}`;
+                } else if (tokenData.tokenType === 'ApiKey' && tokenData.token) {
+                    base['X-Api-Key'] = tokenData.token;
+                }
+                // Multi-key providers (e.g. Pairtree needs X-PIPER-KEY + X-CLIENT-KEY)
+                if (tokenData.headers) {
+                    Object.assign(base, tokenData.headers);
+                }
+                console.log(`[SensorAPI] Auth via Trevor for ${farmName}/${providerId}`);
+                return base;
+            }
+        }
+
+        // 2. Fall back: fetch directly from farm's Key Vault
         const config = await this.farmConfig.getFarmConfig(farmName);
         const providerInfo = providerId ? this.getProvider(providerId) : null;
         const secretName = providerInfo?.keyVaultSecret
@@ -106,38 +144,30 @@ class SensorAPIClient {
             || 'sensor-api-key';
 
         try {
-            return await this.keyVault.getSecret(config.keyVaultName, secretName);
+            const apiKey = await this.keyVault.getSecret(config.keyVaultName, secretName);
+            if (apiKey) base['X-Api-Key'] = apiKey;
         } catch (err) {
-            // Try generic fallback secret
+            // Try generic fallback
             if (secretName !== 'sensor-api-key') {
                 try {
-                    return await this.keyVault.getSecret(config.keyVaultName, 'sensor-api-key');
+                    const fallback = await this.keyVault.getSecret(config.keyVaultName, 'sensor-api-key');
+                    if (fallback) base['X-Api-Key'] = fallback;
                 } catch (_) {}
             }
-            console.warn(`[SensorAPI] No API key in '${config.keyVaultName}' for provider '${providerId || 'generic'}': ${err.message}`);
-            return null;
+            console.warn(`[SensorAPI] KV fallback: no key in '${config.keyVaultName}' for '${providerId}': ${err.message}`);
         }
-    }
 
-    _buildHeaders(farmName, apiKey, providerId = null) {
-        const headers = {
-            'X-Farm-Name': farmName,
-            'X-Site-Id': farmName
-        };
-        if (this.apimKey) headers['Ocp-Apim-Subscription-Key'] = this.apimKey;
-        if (apiKey) headers['X-Api-Key'] = apiKey;
-        if (providerId) headers['X-Provider'] = providerId;
-        return headers;
+        return base;
     }
 
     async _get(endpoint, farmName, params = {}, providerId = null) {
         if (!this.enabled) {
             throw new Error('SENSOR_APIM_URL not configured. Set it in your .env file.');
         }
-        const apiKey = await this._getFarmApiKey(farmName, providerId);
+        const headers = await this._getAuthHeaders(farmName, providerId);
         const url = `${this.apimBaseUrl}${endpoint}`;
         const response = await axios.get(url, {
-            headers: this._buildHeaders(farmName, apiKey, providerId),
+            headers,
             params: { siteId: farmName, ...params },
             timeout: 15000
         });

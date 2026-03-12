@@ -134,6 +134,9 @@ async function main() {
     // Set agent communication in Discord client
     discord.agentComm = agentComm;
 
+    // Give sensorClient access to agentComm so Trevor handles auth token requests
+    sensorClient.agentComm = agentComm;
+
     // 11. Start Discord client (optional — runs alongside API)
     console.log('Starting Discord client...');
     await discord.start();
