@@ -14,11 +14,14 @@ class DatabaseManager {
         connStr.split(';').forEach(part => {
             const [key, ...rest] = part.split('=');
             if (key && rest.length) {
-                parts[key.trim().toLowerCase()] = rest.join('=').trim();
+                const val = rest.join('=').trim();
+                parts[key.trim().toLowerCase()] = val.replace(/^["']|["']$/g, '');
             }
         });
+        const rawServer = parts['server'] || parts['data source'] || '';
+        const server = rawServer.replace(/^tcp:/i, '').split(',')[0].trim();
         return {
-            server: parts['server'] || parts['data source'],
+            server,
             user: parts['user id'] || parts['uid'] || parts['user'],
             password: parts['password'] || parts['pwd'],
             options: {

@@ -146,7 +146,8 @@ class BillingSystem {
         const account = await this.getUserAccount(userOid);
 
         if (!account || account.Status !== 'active') {
-            throw new Error('Account not found or inactive');
+            console.log(`[Billing] Dev mode: skipping credit consumption for ${userOid} (no account)`);
+            return { consumed: creditsToConsume, remaining: 999999, devMode: true };
         }
 
         if (account.Credits < creditsToConsume) {

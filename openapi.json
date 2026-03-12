@@ -1,0 +1,1026 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Red Dog API",
+    "description": "Red Dog agricultural AI agent — chat, database queries, live sensor data, device control, billing, and social media.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Zerosum Ag"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Local development"
+    },
+    {
+      "url": "https://clawdbot.happybush-1b235e08.australiasoutheast.azurecontainerapps.io",
+      "description": "Azure Container Apps (production)"
+    }
+  ],
+  "tags": [
+    { "name": "health", "description": "Health check" },
+    { "name": "chat", "description": "AI chat with database query + sensor + device control capabilities" },
+    { "name": "database", "description": "Direct database access (SELECT only)" },
+    { "name": "sensors", "description": "Live sensor readings via APIM + per-farm Key Vault (requires SENSOR_APIM_URL)" },
+    { "name": "devices", "description": "LoRaWAN and WattWatchers device control via Azure Functions (requires AZURE_FUNCTIONS_URL)" },
+    { "name": "billing", "description": "Stripe billing, credits, and subscriptions" },
+    { "name": "social", "description": "Instagram, Facebook, LinkedIn, WhatsApp posting and OAuth" },
+    { "name": "webhooks", "description": "Inbound webhooks from third-party services" }
+  ],
+  "paths": {
+
+    "/health": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "database": { "type": "boolean" },
+                    "databases": { "type": "array", "items": { "type": "string" } },
+                    "billing": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/chat": {
+      "post": {
+        "tags": ["chat"],
+        "summary": "Send a message to Red Dog",
+        "description": "Red Dog responds using AI, optionally running SQL queries, live sensor API calls, or device control actions based on intent.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {
+                  "message": { "type": "string", "example": "What's the battery level at Grassgum Farm?" },
+                  "userId": { "type": "string", "example": "user-abc123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reply": { "type": "string" },
+                    "action": { "type": "string", "enum": ["none", "sql", "device_control", "sensor_api"] },
+                    "sql": { "type": "string" },
+                    "data": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "402": { "$ref": "#/components/responses/InsufficientCredits" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+
+    "/api/query": {
+      "post": {
+        "tags": ["database"],
+        "summary": "Run a direct SELECT query",
+        "description": "Executes a read-only SQL SELECT against a connected database. DROP, DELETE, UPDATE, INSERT, TRUNCATE, ALTER, CREATE are blocked.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["sql"],
+                "properties": {
+                  "sql": { "type": "string", "example": "SELECT TOP 10 * FROM [Site Overview]" },
+                  "database": { "type": "string", "example": "zerosumag", "description": "Target database name. Uses active DB if omitted." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Query results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": { "type": "array", "items": { "type": "object" } },
+                    "rowCount": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "403": { "description": "Forbidden — only SELECT queries allowed" },
+          "503": { "$ref": "#/components/responses/DatabaseUnavailable" }
+        }
+      }
+    },
+
+    "/api/schema": {
+      "get": {
+        "tags": ["database"],
+        "summary": "Get cached database schema",
+        "responses": {
+          "200": {
+            "description": "Schema and connected databases",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schema": { "type": "string" },
+                    "databases": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/databases": {
+      "get": {
+        "tags": ["database"],
+        "summary": "List connected databases",
+        "responses": {
+          "200": {
+            "description": "List of connected database names",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "databases": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/DatabaseUnavailable" }
+        }
+      }
+    },
+
+    "/api/tables": {
+      "get": {
+        "tags": ["database"],
+        "summary": "List tables in the active database",
+        "responses": {
+          "200": {
+            "description": "Tables in active database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "database": { "type": "string" },
+                    "tables": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/DatabaseUnavailable" }
+        }
+      }
+    },
+
+    "/api/tables/{database}": {
+      "get": {
+        "tags": ["database"],
+        "summary": "List tables in a specific database",
+        "parameters": [
+          { "name": "database", "in": "path", "required": true, "schema": { "type": "string" }, "example": "zerosumag" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tables in specified database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "database": { "type": "string" },
+                    "tables": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/DatabaseUnavailable" }
+        }
+      }
+    },
+
+    "/api/tables/{database}/{table}": {
+      "get": {
+        "tags": ["database"],
+        "summary": "Get schema for a specific table",
+        "parameters": [
+          { "name": "database", "in": "path", "required": true, "schema": { "type": "string" }, "example": "zerosumag" },
+          { "name": "table", "in": "path", "required": true, "schema": { "type": "string" }, "example": "Site Overview" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Table column schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "database": { "type": "string" },
+                    "table": { "type": "string" },
+                    "columns": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/DatabaseUnavailable" }
+        }
+      }
+    },
+
+    "/api/sensors/farms": {
+      "get": {
+        "tags": ["sensors"],
+        "summary": "List all farms from Site Overview",
+        "description": "Requires SENSOR_APIM_URL to be configured.",
+        "responses": {
+          "200": {
+            "description": "List of farms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "farms": { "type": "array", "items": { "$ref": "#/components/schemas/Farm" } }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+
+    "/api/sensors/all/latest": {
+      "get": {
+        "tags": ["sensors"],
+        "summary": "Latest readings across all farms",
+        "parameters": [
+          { "name": "provider", "in": "query", "schema": { "type": "string" }, "example": "selectronic" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest readings per farm",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "farms": { "type": "array", "items": { "$ref": "#/components/schemas/SensorReading" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/sensors/{farm}/latest": {
+      "get": {
+        "tags": ["sensors"],
+        "summary": "Latest readings for a farm",
+        "parameters": [
+          { "name": "farm", "in": "path", "required": true, "schema": { "type": "string" }, "example": "Grassgum%20Farm" },
+          { "name": "provider", "in": "query", "schema": { "type": "string" }, "example": "selectronic", "description": "Omit to get all providers" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest sensor readings",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SensorReading" } }
+            }
+          },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+
+    "/api/sensors/{farm}/history": {
+      "get": {
+        "tags": ["sensors"],
+        "summary": "Historical readings for a farm",
+        "parameters": [
+          { "name": "farm", "in": "path", "required": true, "schema": { "type": "string" }, "example": "Grassgum%20Farm" },
+          { "name": "provider", "in": "query", "required": true, "schema": { "type": "string" }, "example": "selectronic" },
+          { "name": "hours", "in": "query", "schema": { "type": "integer", "default": 24 }, "example": 48 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historical sensor readings",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SensorReading" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+
+    "/api/sensors/{farm}/vault": {
+      "get": {
+        "tags": ["sensors"],
+        "summary": "Get the Key Vault name for a farm",
+        "parameters": [
+          { "name": "farm", "in": "path", "required": true, "schema": { "type": "string" }, "example": "Grassgum%20Farm" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Key Vault name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "farmName": { "type": "string" },
+                    "keyVaultName": { "type": "string", "example": "GrassgumFarm" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/devices/lorawan": {
+      "get": {
+        "tags": ["devices"],
+        "summary": "List all LoRaWAN devices",
+        "description": "Requires AZURE_FUNCTIONS_URL to be configured.",
+        "responses": {
+          "200": { "description": "Device list", "content": { "application/json": { "schema": { "type": "object" } } } },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+
+    "/api/devices/lorawan/{deviceId}/status": {
+      "get": {
+        "tags": ["devices"],
+        "summary": "Get LoRaWAN device status",
+        "parameters": [
+          { "name": "deviceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Device status", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/devices/lorawan/{deviceId}/relay": {
+      "get": {
+        "tags": ["devices"],
+        "summary": "Get relay status for a LoRaWAN device",
+        "parameters": [
+          { "name": "deviceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Relay status", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      },
+      "post": {
+        "tags": ["devices"],
+        "summary": "Control a relay on a LoRaWAN device",
+        "parameters": [
+          { "name": "deviceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["relayId", "state"],
+                "properties": {
+                  "relayId": { "type": "integer", "example": 1, "description": "Relay number (1 or 2)" },
+                  "state": { "type": "boolean", "example": true, "description": "true = ON, false = OFF" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Relay control result", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/devices/wattwatchers/{deviceId}/switches": {
+      "get": {
+        "tags": ["devices"],
+        "summary": "Get WattWatchers switch status",
+        "parameters": [
+          { "name": "deviceId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "siteId", "in": "query", "schema": { "type": "string" }, "description": "Privacy isolation site ID" }
+        ],
+        "responses": {
+          "200": { "description": "Switch status", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      },
+      "patch": {
+        "tags": ["devices"],
+        "summary": "Control a WattWatchers switch",
+        "parameters": [
+          { "name": "deviceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["switchId", "state"],
+                "properties": {
+                  "switchId": { "type": "string", "example": "S1" },
+                  "state": { "type": "string", "enum": ["open", "closed"] },
+                  "siteId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Switch control result", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/devices/wattwatchers/{deviceId}/energy": {
+      "get": {
+        "tags": ["devices"],
+        "summary": "Get latest energy data for a WattWatchers device",
+        "parameters": [
+          { "name": "deviceId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "siteId", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Energy data", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/billing/{userOid}": {
+      "get": {
+        "tags": ["billing"],
+        "summary": "Get billing summary for a user",
+        "parameters": [
+          { "name": "userOid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Billing summary", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/credits/{userOid}": {
+      "get": {
+        "tags": ["billing"],
+        "summary": "Get credit balance for a user",
+        "parameters": [
+          { "name": "userOid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Credit balance", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/billing/payment": {
+      "post": {
+        "tags": ["billing"],
+        "summary": "Create a Stripe payment intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["userOid", "amount"],
+                "properties": {
+                  "userOid": { "type": "string" },
+                  "amount": { "type": "integer", "description": "Amount in cents", "example": 1000 },
+                  "currency": { "type": "string", "default": "aud", "example": "aud" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Payment intent", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/billing/webhook": {
+      "post": {
+        "tags": ["billing"],
+        "summary": "Stripe payment confirmation webhook",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["paymentIntentId"],
+                "properties": {
+                  "paymentIntentId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Confirmation result", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/billing/subscription": {
+      "post": {
+        "tags": ["billing"],
+        "summary": "Create a Stripe subscription",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["userOid", "plan"],
+                "properties": {
+                  "userOid": { "type": "string" },
+                  "plan": { "type": "string", "example": "pro" },
+                  "paymentMethodId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Subscription details", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/billing/account": {
+      "post": {
+        "tags": ["billing"],
+        "summary": "Create a user account",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["userOid", "userEmail"],
+                "properties": {
+                  "userOid": { "type": "string" },
+                  "userEmail": { "type": "string", "format": "email" },
+                  "userName": { "type": "string" },
+                  "plan": { "type": "string", "example": "free" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Account details", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/auth/{platform}": {
+      "get": {
+        "tags": ["social"],
+        "summary": "Initiate OAuth flow for a social platform",
+        "parameters": [
+          { "name": "platform", "in": "path", "required": true, "schema": { "type": "string", "enum": ["instagram", "facebook", "linkedin"] } },
+          { "name": "userId", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth redirect URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authUrl": { "type": "string", "format": "uri" },
+                    "platform": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["social"],
+        "summary": "Disconnect a social platform",
+        "parameters": [
+          { "name": "platform", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "userId", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Disconnected", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/auth/callback": {
+      "get": {
+        "tags": ["social"],
+        "summary": "OAuth callback — exchanges code for token",
+        "parameters": [
+          { "name": "code", "in": "query", "schema": { "type": "string" } },
+          { "name": "state", "in": "query", "schema": { "type": "string" } },
+          { "name": "platform", "in": "query", "schema": { "type": "string" } },
+          { "name": "userId", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Token exchanged successfully", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/status": {
+      "get": {
+        "tags": ["social"],
+        "summary": "Get authentication status for all platforms",
+        "parameters": [
+          { "name": "userId", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Auth status per platform", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/instagram/post": {
+      "post": {
+        "tags": ["social"],
+        "summary": "Create an Instagram post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["caption", "imageUrl"],
+                "properties": {
+                  "userId": { "type": "string" },
+                  "caption": { "type": "string" },
+                  "imageUrl": { "type": "string", "format": "uri" },
+                  "mediaType": { "type": "string", "enum": ["IMAGE", "VIDEO", "REELS"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Post result", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/facebook/post": {
+      "post": {
+        "tags": ["social"],
+        "summary": "Create a Facebook page post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {
+                  "userId": { "type": "string" },
+                  "message": { "type": "string" },
+                  "link": { "type": "string", "format": "uri" },
+                  "imageUrl": { "type": "string", "format": "uri" },
+                  "pageId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Post result", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/facebook/ad": {
+      "post": {
+        "tags": ["social"],
+        "summary": "Create a Facebook ad campaign",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["campaignName"],
+                "properties": {
+                  "userId": { "type": "string" },
+                  "campaignName": { "type": "string" },
+                  "adSetName": { "type": "string" },
+                  "adName": { "type": "string" },
+                  "targeting": { "type": "object" },
+                  "creative": { "type": "object" },
+                  "budget": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Ad campaign result", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/linkedin/post": {
+      "post": {
+        "tags": ["social"],
+        "summary": "Create a LinkedIn post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text"],
+                "properties": {
+                  "userId": { "type": "string" },
+                  "text": { "type": "string" },
+                  "imageUrl": { "type": "string", "format": "uri" },
+                  "link": { "type": "string", "format": "uri" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Post result", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/whatsapp/send": {
+      "post": {
+        "tags": ["social"],
+        "summary": "Send a plain text WhatsApp message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["to", "text"],
+                "properties": {
+                  "to": { "type": "string", "example": "+61400000000" },
+                  "text": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Message sent", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/whatsapp/media": {
+      "post": {
+        "tags": ["social"],
+        "summary": "Send a WhatsApp media message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["to", "mediaUrl"],
+                "properties": {
+                  "to": { "type": "string" },
+                  "type": { "type": "string", "enum": ["image", "video", "document", "audio"] },
+                  "mediaUrl": { "type": "string", "format": "uri" },
+                  "caption": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Media sent", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/whatsapp/template": {
+      "post": {
+        "tags": ["social"],
+        "summary": "Send a WhatsApp template message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["to", "templateName"],
+                "properties": {
+                  "to": { "type": "string" },
+                  "templateName": { "type": "string" },
+                  "languageCode": { "type": "string", "default": "en_US" },
+                  "components": { "type": "array", "items": { "type": "object" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Template sent", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/whatsapp/broadcast": {
+      "post": {
+        "tags": ["social"],
+        "summary": "Broadcast a WhatsApp message to multiple recipients",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["recipients", "text"],
+                "properties": {
+                  "recipients": { "type": "array", "items": { "type": "string" }, "example": ["+61400000000", "+61411111111"] },
+                  "text": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Broadcast result", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    },
+
+    "/api/social/whatsapp/status": {
+      "get": {
+        "tags": ["social"],
+        "summary": "Check WhatsApp Business API configuration status",
+        "responses": {
+          "200": {
+            "description": "Configuration status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": { "type": "boolean" },
+                    "phoneNumberId": { "type": "string" },
+                    "accessToken": { "type": "string" },
+                    "businessAccountId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/twilio/sms": {
+      "post": {
+        "tags": ["webhooks"],
+        "summary": "Twilio SMS inbound webhook — YES/NO device command confirmations",
+        "description": "Receives SMS replies from the farm operator to confirm or deny device control commands requested via chat.",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "From": { "type": "string", "description": "Sender phone number", "example": "+61467413589" },
+                  "Body": { "type": "string", "description": "SMS body — 'YES' or 'NO'", "example": "YES" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML response",
+            "content": { "text/xml": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    }
+
+  },
+
+  "components": {
+    "schemas": {
+      "Farm": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "example": "Grassgum Farm" },
+          "keyVaultName": { "type": "string", "example": "GrassgumFarm" }
+        }
+      },
+      "SensorReading": {
+        "type": "object",
+        "properties": {
+          "farmName": { "type": "string" },
+          "provider": { "type": "string", "example": "selectronic" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "data": { "type": "object" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request — missing or invalid parameters",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "ServerError": {
+        "description": "Internal server error",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "DatabaseUnavailable": {
+        "description": "Database not connected",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "InsufficientCredits": {
+        "description": "User has insufficient credits",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": { "type": "string" },
+                "required": { "type": "integer" },
+                "available": { "type": "integer" },
+                "suggestion": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
