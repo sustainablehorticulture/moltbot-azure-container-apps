@@ -5,13 +5,14 @@ const TopicManager = require('./topic-manager');
 const KnowledgeGraph = require('./knowledge-graph');
 
 class AIEngine {
-    constructor(db, billing = null, blobStorage = null, serviceBus = null, approvalManager = null, deviceCommands = null) {
+    constructor(db, billing = null, blobStorage = null, serviceBus = null, approvalManager = null, deviceCommands = null, sensorCommands = null) {
         this.db = db;
         this.billing = billing;
         this.blobStorage = blobStorage;
         this.serviceBus = serviceBus;
         this.approvalManager = approvalManager;
         this.deviceCommands = deviceCommands;
+        this.sensorCommands = sensorCommands;
         this.schemaCache = null;
         this.model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
         this.apiKey = process.env.OPENROUTER_API_KEY;
@@ -220,7 +221,21 @@ Device types and required fields:
 - wattwatchers_status: device_id (get switch status)
 - wattwatchers_energy: device_id (get latest energy data)
 
-IMPORTANT: Never emit device_control JSON for queries — only for actual control commands or status reads.`;
+IMPORTANT: Never emit device_control JSON for queries — only for actual control commands or status reads.
+
+When the user asks for LIVE or REAL-TIME sensor data from an external provider (Selectronic, weather stations, soil sensors, energy meters, WattWatchers energy data), respond with:
+{"action": "sensor_api", "farm": "<farm name>", "provider": "<provider>", "type": "<type>"}
+
+Sensor API fields:
+- farm: exact farm name from Site Overview table (e.g. "Grassgum Farm") or "all" for all farms
+- provider: lowercase provider name e.g. "selectronic", "weather", "soil", "energy", "lorawan" — omit for all providers
+- type: "latest" (default), "history" (requires hours field), "device" (requires device_id), "list_farms"
+- hours: number of hours for history (default 24)
+- device_id: specific device ID for device type
+
+Use database queries (SQL) for averages, trends, historical analysis from stored data.
+Use sensor_api for LIVE real-time readings directly from sensor APIs.
+`;
 
         // Add topic awareness
         if (this.topicManager) {
@@ -339,7 +354,18 @@ IMPORTANT: Never emit device_control JSON for queries — only for actual contro
 
             const aiReply = firstResponse.data.choices[0].message.content;
 
-            // Step 2a: Check if AI wants to control a device
+            // Step 2a: Check if AI wants to fetch live sensor data
+            if (this.sensorCommands) {
+                const sensorAction = this.sensorCommands.parseSensorAction(aiReply);
+                if (sensorAction) {
+                    const result = await this.sensorCommands.executeAction(sensorAction);
+                    await this.addToHistory(userId, 'user', userMessage);
+                    await this.addToHistory(userId, 'assistant', result.reply);
+                    return { reply: result.reply, sensorAction };
+                }
+            }
+
+            // Step 2b: Check if AI wants to control a device
             if (this.deviceCommands) {
                 const deviceAction = this.deviceCommands.parseDeviceAction(aiReply);
                 if (deviceAction) {

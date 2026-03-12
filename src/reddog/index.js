@@ -11,6 +11,8 @@ const SocialMediaManager = require('./social-media-manager');
 const AgentCommunicationManager = require('./agent-communication');
 const FunctionsClient = require('./functions-client');
 const DeviceCommands = require('./device-commands');
+const SensorAPIClient = require('./sensor-api-client');
+const SensorCommands = require('./sensor-commands');
 
 async function main() {
     console.log('=== Red Dog Starting ===');
@@ -102,9 +104,15 @@ async function main() {
     const deviceCommands = new DeviceCommands({ functionsClient });
     console.log('Device Control:', functionsClient.enabled ? `Connected (${functionsClient.baseUrl})` : 'Disabled (set AZURE_FUNCTIONS_URL + AZURE_FUNCTIONS_KEY)');
 
+    // 7b. Initialize Sensor API client (APIM + per-farm Key Vault)
+    console.log('Initializing sensor API client...');
+    const sensorClient = new SensorAPIClient(db);
+    const sensorCommands = new SensorCommands({ sensorClient });
+    console.log('Sensor API:', sensorClient.enabled ? `Connected (${sensorClient.apimBaseUrl})` : 'Disabled (set SENSOR_APIM_URL)');
+
     // 8. Initialize AI engine
     console.log('Initializing AI engine...');
-    const ai = new AIEngine(db, billing, blobStorage, serviceBus, approvalManager, deviceCommands);
+    const ai = new AIEngine(db, billing, blobStorage, serviceBus, approvalManager, deviceCommands, sensorCommands);
     if (db.isConnected) {
         console.log('Caching database schema (this may take a moment)...');
         await ai.cacheSchema();
@@ -112,7 +120,7 @@ async function main() {
 
     // 9. Start API server
     console.log('Starting API server...');
-    const api = new APIServer(ai, db, blobStorage, serviceBus, approvalManager, socialMedia, deviceCommands);
+    const api = new APIServer(ai, db, blobStorage, serviceBus, approvalManager, socialMedia, deviceCommands, sensorCommands);
     await api.start();
 
     // 10. Initialize agent communication manager
@@ -140,6 +148,7 @@ async function main() {
     console.log(`Social Media: Instagram, Facebook, LinkedIn`);
     console.log(`Agent Comms:  ${agentComm.getStatus().serviceBusConnected ? 'Trevor, Daisy Bell' : 'Disabled'}`);
     console.log(`Device Control: ${functionsClient.enabled ? 'LoRaWAN + WattWatchers' : 'Disabled'}`);
+    console.log(`Sensor API:   ${sensorClient.enabled ? `APIM → per-farm Key Vault` : 'Disabled (set SENSOR_APIM_URL)'}`);
     console.log(`Twilio SMS:   ${process.env.TWILIO_ACCOUNT_SID ? 'Configured (webhook: /api/twilio/sms)' : 'Disabled'}`);
 
     // Graceful shutdown

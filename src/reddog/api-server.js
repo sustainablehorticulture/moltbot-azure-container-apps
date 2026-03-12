@@ -3,7 +3,7 @@ const cors = require('cors');
 const BillingSystem = require('./billing-system');
 
 class APIServer {
-    constructor(aiEngine, db, blobStorage, serviceBus, approvalManager, socialMedia, deviceCommands = null) {
+    constructor(aiEngine, db, blobStorage, serviceBus, approvalManager, socialMedia, deviceCommands = null, sensorCommands = null) {
         this.aiEngine = aiEngine;
         this.db = db;
         this.blobStorage = blobStorage;
@@ -11,6 +11,7 @@ class APIServer {
         this.approvalManager = approvalManager;
         this.socialMedia = socialMedia;
         this.deviceCommands = deviceCommands;
+        this.sensorCommands = sensorCommands;
         this.billing = new BillingSystem({ db });
         this.app = express();
         this.port = process.env.API_PORT || process.env.GATEWAY_PORT || 3001;
@@ -68,6 +69,56 @@ class APIServer {
                 res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Message>Red Dog encountered an error processing your reply.</Message></Response>');
             }
         });
+
+        // Sensor API routes (live readings via APIM + per-farm Key Vault)
+        if (this.sensorCommands && this.sensorCommands.sensor && this.sensorCommands.sensor.enabled) {
+            // GET /api/sensors/farms — list all farms from Site Overview
+            this.app.get('/api/sensors/farms', async (req, res) => {
+                try {
+                    const farms = await this.sensorCommands.sensor.listFarms();
+                    res.json({ farms });
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            // GET /api/sensors/:farm/latest — latest readings for a farm
+            this.app.get('/api/sensors/:farm/latest', async (req, res) => {
+                try {
+                    const farmName = decodeURIComponent(req.params.farm);
+                    const provider = req.query.provider || null;
+                    const data = await this.sensorCommands.sensor.getLatestReadings(farmName, provider);
+                    res.json(data);
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            // GET /api/sensors/:farm/history — historical readings
+            this.app.get('/api/sensors/:farm/history', async (req, res) => {
+                try {
+                    const farmName = decodeURIComponent(req.params.farm);
+                    const { provider, hours = 24 } = req.query;
+                    if (!provider) return res.status(400).json({ error: 'provider query param required' });
+                    const data = await this.sensorCommands.sensor.getHistory(farmName, provider, parseInt(hours));
+                    res.json(data);
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            // GET /api/sensors/all/latest — aggregate all farms
+            this.app.get('/api/sensors/all/latest', async (req, res) => {
+                try {
+                    const provider = req.query.provider || null;
+                    const data = await this.sensorCommands.sensor.getAllFarmsReadings(provider);
+                    res.json({ farms: data });
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            // GET /api/sensors/:farm/vault — check Key Vault name for a farm
+            this.app.get('/api/sensors/:farm/vault', async (req, res) => {
+                try {
+                    const farmName = decodeURIComponent(req.params.farm);
+                    const vaultName = await this.sensorCommands.sensor.getFarmVaultName(farmName);
+                    res.json({ farmName, keyVaultName: vaultName });
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+        }
 
         // Device control routes (direct API access)
         if (this.deviceCommands && this.deviceCommands.functions && this.deviceCommands.functions.enabled) {
