@@ -235,6 +235,17 @@ Sensor API fields:
 
 Use database queries (SQL) for averages, trends, historical analysis from stored data.
 Use sensor_api for LIVE real-time readings directly from sensor APIs.
+
+When the user asks to post on social media, run an ad, or message the team, respond with:
+{"action": "social_action", "platform": "<platform>", "type": "<type>", "content": "<suggested content>"}
+
+Social action fields:
+- platform: "instagram", "facebook", "linkedin", "whatsapp"
+- type: "post" (instagram/facebook/linkedin), "ad" (facebook), "message" (whatsapp)
+- content: draft caption, post text, ad copy, or message text — write this as Red Dog would, farm-themed and punchy
+- recipients: (whatsapp only) list of recipient numbers if known, otherwise omit
+
+Always draft compelling content based on any recent farm data you have. If posting, suggest a suitable image description too.
 `;
 
         // Inject available sensor providers dynamically from registry
@@ -389,7 +400,21 @@ Use sensor_api for LIVE real-time readings directly from sensor APIs.
                 }
             }
 
-            // Step 2b: Check if AI wants to run a query
+            // Step 2c: Check if AI wants to post to social media
+            const socialMatch = aiReply.match(/\{[\s\S]*?"action"\s*:\s*"social_action"[\s\S]*?\}/);
+            if (socialMatch) {
+                try {
+                    const socialAction = JSON.parse(socialMatch[0]);
+                    const platformLabels = { instagram: '📸 Instagram', facebook: '📣 Facebook', linkedin: '💼 LinkedIn', whatsapp: '💬 WhatsApp' };
+                    const label = platformLabels[socialAction.platform] || socialAction.platform;
+                    const reply = `${label} ${socialAction.type === 'ad' ? 'Ad' : socialAction.type === 'message' ? 'Message' : 'Post'} — here's what I'd say, mate:\n\n${socialAction.content}${socialAction.imageDescription ? `\n\n📷 _Suggested image: ${socialAction.imageDescription}_` : ''}`;
+                    await this.addToHistory(userId, 'user', userMessage);
+                    await this.addToHistory(userId, 'assistant', reply);
+                    return { reply, socialAction };
+                } catch (_) {}
+            }
+
+            // Step 2d: Check if AI wants to run a query
             const queryMatch = aiReply.match(/\{[\s\S]*?"action"\s*:\s*"query"[\s\S]*?\}/);
             if (queryMatch && this.db && this.db.isConnected) {
                 try {

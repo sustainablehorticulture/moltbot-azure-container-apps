@@ -176,6 +176,51 @@ class APIServer {
             });
         }
 
+        // Quick-action prompt chips for chat UI
+        this.app.get('/api/chat/prompts', (req, res) => {
+            res.json({
+                greeting: this.aiEngine?.persona?.greeting || "G'day! Give me a command!",
+                prompts: [
+                    {
+                        id: 'realtime',
+                        label: '📡 Real time data treats',
+                        message: 'Show me the latest real-time sensor readings for the farm',
+                        category: 'sensors'
+                    },
+                    {
+                        id: 'insights',
+                        label: '📊 Long term insights',
+                        message: 'Give me long-term trends and analysis from the farm database',
+                        category: 'database'
+                    },
+                    {
+                        id: 'control',
+                        label: '🎛️ Control farm systems',
+                        message: 'What farm systems and devices can I control right now?',
+                        category: 'devices'
+                    },
+                    {
+                        id: 'trev',
+                        label: '🚜 Retrieve data for Trev',
+                        message: 'Fetch the latest farm data and send it to @Trevor',
+                        category: 'agents'
+                    },
+                    {
+                        id: 'social',
+                        label: '✨ Show off — post some tricks',
+                        message: null,
+                        category: 'social',
+                        children: [
+                            { id: 'instagram', label: '📸 Post to Instagram', message: 'Create an Instagram post showcasing the farm' },
+                            { id: 'facebook_ad', label: '📣 Run a Facebook Ad', message: 'Set up a Facebook ad campaign for the farm' },
+                            { id: 'linkedin', label: '💼 Post to LinkedIn', message: 'Write a professional LinkedIn post about the farm' },
+                            { id: 'whatsapp', label: '💬 Message the team on WhatsApp', message: 'Send a farm update to the team on WhatsApp' }
+                        ]
+                    }
+                ]
+            });
+        });
+
         // Chat endpoint — send a message, get an AI response (with optional DB queries)
         this.app.post('/api/chat', async (req, res) => {
             try {
