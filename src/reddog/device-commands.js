@@ -142,14 +142,15 @@ class DeviceCommands {
                     console.warn('[DeviceCommands] Failed to send SMS result:', err.message);
                 }
             }
-            return result;
+            // Include userId so webhook can inject into chat history
+            return { ...result, userId: pending.userId };
         } else {
             if (this.smsService) {
                 try {
                     await this.smsService.sendSMS(phoneNumber, 'Red Dog: Command cancelled. No changes made.');
                 } catch (err) { /* ignore */ }
             }
-            return { executed: false, reply: 'Command cancelled via SMS.' };
+            return { executed: false, reply: 'Command cancelled via SMS.', userId: pending.userId };
         }
     }
 

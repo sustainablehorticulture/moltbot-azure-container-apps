@@ -52,6 +52,10 @@ class APIServer {
                 if (this.deviceCommands) {
                     const result = await this.deviceCommands.resolveSMSConfirmation(from, body);
                     if (result) {
+                        // Post the result to the user's chat history so it appears in Red Dog's chat bubble
+                        if (result.executed && this.aiEngine && result.userId) {
+                            await this.aiEngine.addToHistory(result.userId, 'assistant', result.reply);
+                        }
                         // SMS response already sent by DeviceCommands — just acknowledge
                         return res.type('text/xml').send(`${twiml}</Response>`);
                     }
