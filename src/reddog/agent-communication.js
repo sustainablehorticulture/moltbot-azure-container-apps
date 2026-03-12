@@ -284,7 +284,7 @@ class AgentCommunicationManager {
                     farmName,
                     providerId
                 },
-                timeoutMs: 15000
+                timeoutMs: 3000
             });
 
             if (!response.payload || !response.payload.token && !response.payload.headers) {

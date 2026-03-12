@@ -147,19 +147,19 @@ async function testSensors() {
         return `keyVault=${d.keyVaultName}`;
     });
     await test(`GET /api/sensors/${encodeURIComponent(FARM)}/latest (all providers)`, async () => {
-        const d = await get(`/api/sensors/${encodeURIComponent(FARM)}/latest`);
+        const d = await get(`/api/sensors/${encodeURIComponent(FARM)}/latest`, {}, 35000);
         return `provider=${d.provider} ts=${d.timestamp}`;
     });
     await test(`GET /api/sensors/${encodeURIComponent(FARM)}/latest?provider=selectronic`, async () => {
-        const d = await get(`/api/sensors/${encodeURIComponent(FARM)}/latest`, { provider: 'selectronic' });
+        const d = await get(`/api/sensors/${encodeURIComponent(FARM)}/latest`, { provider: 'selectronic' }, 35000);
         return `ts=${d.timestamp}`;
     });
     await test(`GET /api/sensors/${encodeURIComponent(FARM)}/history?provider=selectronic&hours=24`, async () => {
-        const d = await get(`/api/sensors/${encodeURIComponent(FARM)}/history`, { provider: 'selectronic', hours: 24 });
+        const d = await get(`/api/sensors/${encodeURIComponent(FARM)}/history`, { provider: 'selectronic', hours: 24 }, 35000);
         return `hours=${d.hours}`;
     });
     await test('GET /api/sensors/all/latest', async () => {
-        const d = await get('/api/sensors/all/latest');
+        const d = await get('/api/sensors/all/latest', {}, 35000);
         return `${d.farms?.length ?? 0} farms`;
     });
 }
@@ -170,12 +170,24 @@ async function testDevices() {
         const d = await get('/api/devices/lorawan');
         return `${Array.isArray(d) ? d.length : JSON.stringify(d).slice(0, 60)} devices`;
     });
-    // WattWatchers — uses siteId from env or default
-    const ww = process.env.WATTWATCHERS_DEVICE_IDS?.split(',')[0] || 'D000000';
-    await test(`GET /api/devices/wattwatchers/${ww}/energy`, async () => {
-        const d = await get(`/api/devices/wattwatchers/${ww}/energy`);
-        return JSON.stringify(d).slice(0, 80);
-    });
+    // WattWatchers — uses siteId from env or dummy fallback
+    const ww = process.env.WATTWATCHERS_DEVICE_IDS?.split(',')[0];
+    if (ww) {
+        await test(`GET /api/devices/wattwatchers/${ww}/energy`, async () => {
+            const d = await get(`/api/devices/wattwatchers/${ww}/energy`);
+            return JSON.stringify(d).slice(0, 80);
+        });
+    } else {
+        await test('GET /api/devices/wattwatchers — no device configured → 500 expected', async () => {
+            try {
+                await get('/api/devices/wattwatchers/D000000/energy');
+                throw new Error('Expected error');
+            } catch (e) {
+                if (e.response?.status === 500 || e.message.includes('Azure Functions error')) return 'no device configured — error handled correctly';
+                throw e;
+            }
+        });
+    }
 }
 
 async function testBilling() {

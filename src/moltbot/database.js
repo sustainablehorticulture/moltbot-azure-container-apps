@@ -43,33 +43,26 @@ class DatabaseManager {
         this.serverConfig = this.parseConnectionString(this.config.connectionString);
         const dbNames = this.config.databases || [];
 
-        for (let attempt = 1; attempt <= retries; attempt++) {
+        for (const dbName of dbNames) {
+            if (this.pools[dbName]) continue;
             try {
-                for (const dbName of dbNames) {
-                    if (!this.pools[dbName]) {
-                        await this.connectToDatabase(dbName);
-                    }
-                }
-
-                if (dbNames.length > 0 && !this.activeDb) {
-                    this.activeDb = dbNames[0];
-                }
-
-                this.isConnected = Object.keys(this.pools).length > 0;
-                console.log(`Database manager connected to ${Object.keys(this.pools).length} database(s): ${Object.keys(this.pools).join(', ')}`);
-                return this.isConnected;
+                await this.connectToDatabase(dbName);
             } catch (error) {
-                console.error(`Database connection attempt ${attempt}/${retries} failed: ${error.message}`);
-                if (attempt < retries) {
-                    const delay = attempt * 5000;
-                    console.log(`Retrying in ${delay / 1000}s...`);
-                    await new Promise(r => setTimeout(r, delay));
-                }
+                console.error(`Failed to connect to database '${dbName}': ${error.message}`);
             }
         }
 
-        console.error('Database connection failed after all retries');
-        return false;
+        if (dbNames.length > 0 && !this.activeDb) {
+            this.activeDb = Object.keys(this.pools)[0] || null;
+        }
+
+        this.isConnected = Object.keys(this.pools).length > 0;
+        if (this.isConnected) {
+            console.log(`Database manager connected to ${Object.keys(this.pools).length} database(s): ${Object.keys(this.pools).join(', ')}`);
+        } else {
+            console.error('Database connection failed: no databases could be connected');
+        }
+        return this.isConnected;
     }
 
     async connectToDatabase(dbName) {

@@ -8,7 +8,7 @@
     "selectronic": {
       "name": "Selectronic SP PRO",
       "description": "Solar/battery inverter — battery SoC, solar/grid/load power (W), daily energy (kWh), fault codes. Cloud access via select.live using site ID.",
-      "apimPath": "/sensors/selectronic",
+      "apimPath": "/selectronic",
       "backendUrl": "https://select.live",
       "backendPaths": {
         "latest": "/dashboard/hfdata/{siteId}",

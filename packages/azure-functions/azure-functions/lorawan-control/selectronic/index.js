@@ -66,7 +66,7 @@ app.http('selectronic', {
                     };
             }
         } catch (err) {
-            context.log.error(`[Selectronic] Error for farm=${farmName} action=${action}:`, err.message);
+            context.error(`[Selectronic] Error for farm=${farmName} action=${action}:`, err.message);
 
             const isAuthError = err.message.includes('login failed') || err.message.includes('401');
             return {

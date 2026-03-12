@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const SELECT_LIVE_BASE = 'https://select.live/cgi-bin/solarmonweb';
+const SELECT_LIVE_BASE = 'https://select.live';
 const SESSION_TTL_MS = 25 * 60 * 1000; // 25 minutes (select.live sessions ~30 min)
 const KV_API_VERSION = '7.4';
 
@@ -50,15 +50,28 @@ class SelectronicService {
             );
             tokenData = res.data;
         } else {
-            const res = await axios.get(
-                'http://169.254.169.254/metadata/identity/oauth2/token',
-                {
-                    params: { 'api-version': '2018-02-01', resource: 'https://vault.azure.net' },
-                    headers: { Metadata: 'true' },
+            // Azure Functions / Container Apps use IDENTITY_ENDPOINT + IDENTITY_HEADER
+            const identityEndpoint = process.env.IDENTITY_ENDPOINT;
+            const identityHeader = process.env.IDENTITY_HEADER;
+            if (identityEndpoint && identityHeader) {
+                const res = await axios.get(identityEndpoint, {
+                    params: { resource: 'https://vault.azure.net', 'api-version': '2019-08-01' },
+                    headers: { 'X-IDENTITY-HEADER': identityHeader },
                     timeout: 5000
-                }
-            );
-            tokenData = res.data;
+                });
+                tokenData = res.data;
+            } else {
+                // Fallback: VM IMDS (App Service / VM)
+                const res = await axios.get(
+                    'http://169.254.169.254/metadata/identity/oauth2/token',
+                    {
+                        params: { 'api-version': '2018-02-01', resource: 'https://vault.azure.net' },
+                        headers: { Metadata: 'true' },
+                        timeout: 5000
+                    }
+                );
+                tokenData = res.data;
+            }
         }
 
         this.kvTokenCache = {
@@ -71,8 +84,12 @@ class SelectronicService {
     async _getSecret(vaultName, secretName) {
         const token = await this._getKVToken();
         const url = `https://${vaultName}.vault.azure.net/secrets/${secretName}?api-version=${KV_API_VERSION}`;
-        const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
-        return res.data.value;
+        try {
+            const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+            return res.data.value;
+        } catch (e) {
+            throw new Error(`KV secret '${secretName}' from '${vaultName}': HTTP ${e.response?.status ?? e.message}`);
+        }
     }
 
     async _getCredentials(farmName) {
@@ -96,7 +113,7 @@ class SelectronicService {
     // ── Session auth ──────────────────────────────────────────────────────
 
     async _login(username, password) {
-        const body = new URLSearchParams({ username, password });
+        const body = new URLSearchParams({ email: username, pwd: password });
         const res = await axios.post(
             `${SELECT_LIVE_BASE}/login`,
             body.toString(),
@@ -109,14 +126,14 @@ class SelectronicService {
         );
 
         const setCookie = res.headers['set-cookie'];
-        if (!setCookie) throw new Error('Selectronic login failed: no Set-Cookie header returned');
+        if (!setCookie || setCookie.length === 0) throw new Error(`select.live login failed (HTTP ${res.status}): no Set-Cookie header`);
 
-        const sessionCookie = setCookie
-            .map(c => c.split(';')[0])
-            .find(c => c.startsWith('SelectLive_Session='));
+        const cookies = setCookie.map(c => c.split(';')[0]);
+        // Try canonical cookie name first, then fall back to first cookie
+        const sessionCookie = cookies.find(c => c.startsWith('SelectLive_Session=')) || cookies[0];
 
-        if (!sessionCookie) throw new Error('Selectronic login failed: SelectLive_Session cookie not found');
-        return sessionCookie;
+        if (!sessionCookie) throw new Error(`select.live login failed (HTTP ${res.status}): no cookies in response. Names: ${cookies.join(', ')}`);
+        return cookies.join('; ');
     }
 
     async _getSession(farmName) {
@@ -143,10 +160,15 @@ class SelectronicService {
         const { siteId } = await this._getCredentials(farmName);
         const cookie = await this._getSession(farmName);
 
-        const res = await axios.get(
-            `${SELECT_LIVE_BASE}/dashboard/hfdata/${siteId}`,
-            { headers: this._authHeaders(cookie), timeout: 15000 }
-        );
+        let res;
+        try {
+            res = await axios.get(
+                `${SELECT_LIVE_BASE}/dashboard/getdata/${siteId}`,
+                { headers: this._authHeaders(cookie), timeout: 15000 }
+            );
+        } catch (e) {
+            throw new Error(`select.live getdata fetch for siteId=${siteId}: HTTP ${e.response?.status ?? e.message}`);
+        }
 
         return {
             farmName,
@@ -165,7 +187,7 @@ class SelectronicService {
         const cookie = await this._getSession(farmName);
 
         const res = await axios.get(
-            `${SELECT_LIVE_BASE}/devices/${siteId}`,
+            `${SELECT_LIVE_BASE}/dashboard/devices/${siteId}`,
             { headers: this._authHeaders(cookie), timeout: 15000 }
         );
 
@@ -185,7 +207,7 @@ class SelectronicService {
         const cookie = await this._getSession(farmName);
 
         const res = await axios.get(
-            `${SELECT_LIVE_BASE}/dashboard/hfdata/${siteId}`,
+            `${SELECT_LIVE_BASE}/dashboard/getdata/${siteId}`,
             {
                 headers: this._authHeaders(cookie),
                 params: { period: hours <= 24 ? 'day' : 'week' },

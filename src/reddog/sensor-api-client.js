@@ -169,7 +169,7 @@ class SensorAPIClient {
         const response = await axios.get(url, {
             headers,
             params: { siteId: farmName, ...params },
-            timeout: 15000
+            timeout: 30000
         });
         return response.data;
     }

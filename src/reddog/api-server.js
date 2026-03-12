@@ -80,12 +80,23 @@ class APIServer {
                 } catch (e) { res.status(500).json({ error: e.message }); }
             });
 
-            // GET /api/sensors/:farm/latest — latest readings for a farm
+            // GET /api/sensors/all/latest — aggregate all farms (must be before /:farm/latest)
+            this.app.get('/api/sensors/all/latest', async (req, res) => {
+                try {
+                    const provider = req.query.provider || null;
+                    const data = await this.sensorCommands.sensor.getAllFarmsReadings(provider);
+                    res.json({ farms: data });
+                } catch (e) { res.status(500).json({ error: e.message }); }
+            });
+
+            // GET /api/sensors/:farm/latest — latest readings for a farm (or all providers if no ?provider=)
             this.app.get('/api/sensors/:farm/latest', async (req, res) => {
                 try {
                     const farmName = decodeURIComponent(req.params.farm);
                     const provider = req.query.provider || null;
-                    const data = await this.sensorCommands.sensor.getLatestReadings(farmName, provider);
+                    const data = provider
+                        ? await this.sensorCommands.sensor.getLatestReadings(farmName, provider)
+                        : await this.sensorCommands.sensor.getAllProvidersLatest(farmName);
                     res.json(data);
                 } catch (e) { res.status(500).json({ error: e.message }); }
             });
@@ -98,15 +109,6 @@ class APIServer {
                     if (!provider) return res.status(400).json({ error: 'provider query param required' });
                     const data = await this.sensorCommands.sensor.getHistory(farmName, provider, parseInt(hours));
                     res.json(data);
-                } catch (e) { res.status(500).json({ error: e.message }); }
-            });
-
-            // GET /api/sensors/all/latest — aggregate all farms
-            this.app.get('/api/sensors/all/latest', async (req, res) => {
-                try {
-                    const provider = req.query.provider || null;
-                    const data = await this.sensorCommands.sensor.getAllFarmsReadings(provider);
-                    res.json({ farms: data });
                 } catch (e) { res.status(500).json({ error: e.message }); }
             });
 

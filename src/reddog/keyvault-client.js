@@ -53,7 +53,7 @@ class KeyVaultClient {
         const response = await axios.post(
             `https://login.microsoftonline.com/${AZURE_TENANT_ID}/oauth2/v2.0/token`,
             body.toString(),
-            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 8000 }
         );
         return response.data;
     }
@@ -94,7 +94,8 @@ class KeyVaultClient {
 
         try {
             const response = await axios.get(url, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
+                timeout: 5000
             });
             const value = response.data.value;
             this.secretCache.set(cacheKey, { value, expiry: Date.now() + this.secretCacheTTL });
