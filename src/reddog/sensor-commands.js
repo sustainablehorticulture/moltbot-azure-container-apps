@@ -42,8 +42,22 @@ class SensorCommands {
                 case 'list_farms': {
                     const farms = await this.sensor.listFarms();
                     if (!farms.length) return { reply: '📋 No farms found in Site Overview table.' };
-                    const lines = farms.map(f => `• **${f.name}** → Key Vault: \`${f.keyVaultName}\``);
+                    const lines = farms.map(f => {
+                        const providers = this.sensor.getProvidersForFarm(f.name);
+                        const providerNames = providers.map(p => p.name || p.id).join(', ');
+                        return `• **${f.name}** → Key Vault: \`${f.keyVaultName}\` | APIs: ${providerNames || 'none configured'}`;
+                    });
                     return { reply: `🌾 **Active Farms (${farms.length})**\n${lines.join('\n')}` };
+                }
+
+                case 'list_providers': {
+                    return { reply: this.formatProviderList(farm) };
+                }
+
+                case 'all_providers': {
+                    // Fetch from every configured provider for this farm in parallel
+                    const results = await this.sensor.getAllProvidersLatest(farm);
+                    return { reply: this.formatAllProvidersReadings(results, farm) };
                 }
 
                 case 'latest':
@@ -51,6 +65,11 @@ class SensorCommands {
                     if (farm === 'all') {
                         const results = await this.sensor.getAllFarmsReadings(provider);
                         return { reply: this.formatAllFarmsReadings(results, provider) };
+                    }
+                    // No provider specified — fetch all providers for this farm
+                    if (!provider) {
+                        const results = await this.sensor.getAllProvidersLatest(farm);
+                        return { reply: this.formatAllProvidersReadings(results, farm) };
                     }
                     const result = await this.sensor.getLatestReadings(farm, provider);
                     return { reply: this.formatLatestReadings(result) };
@@ -69,6 +88,9 @@ class SensorCommands {
                     if (!action.device_id) {
                         return { reply: `⚠️ Please specify a device ID.` };
                     }
+                    if (!provider) {
+                        return { reply: `⚠️ Please specify a provider for device lookup (e.g. "selectronic", "lorawan").` };
+                    }
                     const result = await this.sensor.getDeviceReadings(farm, provider, action.device_id);
                     return { reply: this.formatDeviceReadings(result) };
                 }
@@ -77,6 +99,24 @@ class SensorCommands {
             console.error('[SensorCommands] Error:', err.message);
             return { reply: `❌ Sensor API error for **${farm}**: ${err.message}` };
         }
+    }
+
+    /**
+     * Build the provider list section for the AI system prompt.
+     * Called by ai-engine.js to inject available providers dynamically.
+     */
+    buildProviderPrompt(farmName = null) {
+        const farm = farmName || process.env.FARM_ID || 'Grassgum Farm';
+        const providers = this.sensor
+            ? this.sensor.getProvidersForFarm(farm)
+            : [];
+
+        if (!providers.length) return '';
+
+        const lines = providers.map(p =>
+            `- ${p.id}: ${p.name} — ${p.description}`
+        );
+        return `\n\nAvailable sensor providers for ${farm}:\n${lines.join('\n')}\nUse these exact provider IDs in the sensor_api JSON action.`;
     }
 
     // ── Formatting ─────────────────────────────────────────────────────────
@@ -142,6 +182,39 @@ class SensorCommands {
             .filter(([k, v]) => v !== null && v !== undefined)
             .map(([k, v]) => `${k}: **${v}**`);
         return `• ${parts.join(' | ')}\n`;
+    }
+
+    formatAllProvidersReadings(results, farmName) {
+        const ts = new Date().toLocaleTimeString();
+        let out = `📡 **All Sensor Readings — ${farmName}** _${ts}_\n\n`;
+        for (const result of results) {
+            const providerInfo = this.sensor?.getProvider(result.provider);
+            const label = providerInfo?.name || result.provider;
+            if (result.error) {
+                out += `**${label}**: ❌ ${result.error}\n\n`;
+            } else {
+                out += `### ${label}\n`;
+                if (result.data && typeof result.data === 'object') {
+                    out += this._formatObject(result.data, '');
+                } else if (result.data) {
+                    out += String(result.data);
+                } else {
+                    out += '_No data_\n';
+                }
+                out += '\n';
+            }
+        }
+        return out;
+    }
+
+    formatProviderList(farmName) {
+        if (!this.sensor) return '⚠️ Sensor API not configured.';
+        const providers = this.sensor.getProvidersForFarm(farmName);
+        if (!providers.length) return `📋 No sensor providers configured for **${farmName}**.`;
+        const lines = providers.map(p =>
+            `• **${p.name || p.id}** (\`${p.id}\`) — ${p.description || 'No description'}`
+        );
+        return `📋 **Sensor Providers for ${farmName} (${providers.length})**\n${lines.join('\n')}`;
     }
 
     _formatObject(obj, indent = '') {

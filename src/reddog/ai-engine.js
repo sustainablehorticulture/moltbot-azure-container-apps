@@ -237,6 +237,11 @@ Use database queries (SQL) for averages, trends, historical analysis from stored
 Use sensor_api for LIVE real-time readings directly from sensor APIs.
 `;
 
+        // Inject available sensor providers dynamically from registry
+        if (this.sensorCommands && this.sensorCommands.buildProviderPrompt) {
+            prompt += this.sensorCommands.buildProviderPrompt();
+        }
+
         // Add topic awareness
         if (this.topicManager) {
             prompt += this.topicManager.buildTopicAwarePrompt();

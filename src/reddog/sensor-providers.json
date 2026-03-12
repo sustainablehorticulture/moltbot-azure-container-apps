@@ -1,0 +1,99 @@
+{
+  "_comment": "Provider registry for Red Dog sensor API client. APIM base URL: https://reddog.azure-api.net. Key Vault secret names must match secrets stored in each farm's Azure Key Vault.",
+
+  "apimBaseUrl": "https://reddog.azure-api.net",
+
+  "providers": {
+
+    "selectronic": {
+      "name": "Selectronic SP PRO",
+      "description": "Solar/battery inverter — battery SoC, solar/grid/load power (W), daily energy (kWh), fault codes. Cloud access via select.live using site ID.",
+      "apimPath": "/sensors/selectronic",
+      "backendUrl": "https://select.live",
+      "backendPaths": {
+        "latest": "/dashboard/hfdata/{siteId}",
+        "devices": "/devices/",
+        "telemetry": "/devices/{deviceId}/point"
+      },
+      "auth": "session-cookie",
+      "keyVaultSecrets": ["selectronic-site-id", "selectronic-username", "selectronic-password"],
+      "keyVaultSecret": "selectronic-site-id",
+      "fields": ["battery_soc", "battery_w", "solar_wh_today", "solar_wh_total", "load_w", "load_wh_today", "grid_w", "grid_in_wh_today", "fault_code"],
+      "units": { "battery_soc": "%", "battery_w": "W", "solar_wh_today": "kWh", "load_w": "W", "grid_w": "W" }
+    },
+
+    "wattwatchers": {
+      "name": "WattWatchers Energy Monitor",
+      "description": "Circuit-level energy monitoring — real/apparent power, energy (kWh), power factor per circuit. Short energy (30s) and long energy (5min) intervals. Switch control via PATCH.",
+      "apimPath": "/sensors/wattwatchers",
+      "backendUrl": "https://api.wattwatchers.com.au",
+      "backendPaths": {
+        "devices": "/devices",
+        "latest": "/short-energy/{deviceId}/latest",
+        "latestLong": "/long-energy/{deviceId}/latest",
+        "history": "/short-energy/{deviceId}",
+        "historyLong": "/long-energy/{deviceId}",
+        "control": "/devices/{deviceId}"
+      },
+      "auth": "bearer",
+      "keyVaultSecret": "wattwatchers-api-key",
+      "fields": ["eRealNegSum", "eRealPosSum", "eReactiveNegSum", "eReactivePosSum", "qRealNeg", "qRealPos", "pf", "vRms", "iRms"],
+      "units": { "power": "W", "energy": "kWh", "powerFactor": "", "voltage": "V", "current": "A" }
+    },
+
+    "pairtree": {
+      "name": "Pairtree Horticulture",
+      "description": "Horticulture IoT platform — soil moisture, temperature, rainfall, tank levels, weather metrics. Time-series per device. Provides data and device inventory.",
+      "apimPath": "/api/v1",
+      "backendUrl": "https://reddog.azure-api.net/api/v1",
+      "backendPaths": {
+        "devices": "/data/p_list_devices",
+        "latest": "/data/p_data_by_device",
+        "rainfall": "/data/p_rainfall",
+        "dailyRainfall": "/data/p_daily_rainfall",
+        "tankLevel": "/data/p_tank_level",
+        "allDevices": "/data/p_data_by_client"
+      },
+      "auth": "header-keys",
+      "keyVaultSecrets": ["pairtree-x-piper-key", "pairtree-x-client-key"],
+      "keyVaultSecret": "pairtree-x-piper-key",
+      "headers": { "X-PIPER-KEY": "pairtree-x-piper-key", "X-CLIENT-KEY": "pairtree-x-client-key" },
+      "fields": ["timestamp", "value", "uom"],
+      "units": { "moisture": "%VWC", "temperature": "°C", "rainfall": "mm", "tankLevel": "m" }
+    },
+
+    "the_things_network": {
+      "name": "The Things Network (TTN/LoRaWAN)",
+      "description": "LoRaWAN uplink data from TTN v3. Receives decoded sensor payloads from field devices (soil, weather, relay nodes) via APIM webhook. Also supports MQTT at au1.cloud.thethings.network:8883.",
+      "apimPath": "/webhooks/ttn",
+      "backendUrl": "https://reddog.azure-api.net",
+      "backendPaths": {
+        "uplink": "/webhooks/ttn/{applicationId}/uplink",
+        "downlinkAck": "/webhooks/ttn/{applicationId}/downlink/ack"
+      },
+      "auth": "bearer",
+      "keyVaultSecret": "ttn-api-key",
+      "mqtt": {
+        "broker": "au1.cloud.thethings.network",
+        "port": 8883,
+        "tls": true,
+        "usernameTemplate": "{applicationId}@ttn",
+        "uplinkTopic": "v3/{applicationId}@ttn/devices/+/up",
+        "downlinkTopic": "v3/{applicationId}@ttn/devices/{deviceId}/down/push"
+      },
+      "fields": ["decoded_payload", "rssi", "snr", "f_port", "received_at"],
+      "units": { "rssi": "dBm", "snr": "dB" }
+    }
+  },
+
+  "farmProviders": {
+    "Grassgum Farm": ["selectronic", "wattwatchers", "pairtree"],
+    "Zerosum Ag": ["pairtree", "the_things_network"]
+  },
+
+  "_notes": {
+    "selectronicSiteId": "Grassgum Farm site ID = 3501 (stored in GrassgumFarm Key Vault as 'selectronic-site-id')",
+    "apimAlreadyConfigured": "APIM is live at reddog.azure-api.net. Pairtree routes through /api/v1, TTN webhooks through /webhooks/ttn.",
+    "addingProviders": "To add a new provider: 1) Add entry here, 2) Create API in APIM with Key Vault policy, 3) Add secret to farm Key Vault, 4) Add provider ID to farmProviders for relevant farms."
+  }
+}
