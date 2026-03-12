@@ -44,16 +44,42 @@ class SensorAPIClient {
 
     /**
      * Get the list of providers available for a specific farm.
-     * Falls back to all providers if not configured.
+     * Source priority:
+     *   1. `IoT Infrastructure` table in zerosumag DB (written by Trevor on provisioning)
+     *   2. `farmProviders` map in sensor-providers.json (static fallback)
+     *   3. All providers in the registry (last resort)
+     *
+     * Each provider entry may include APIMPath/KeyVaultName overrides from the DB row.
      */
-    getProvidersForFarm(farmName) {
+    async getProvidersForFarm(farmName) {
+        // 1. Try database IoT Infrastructure table
+        try {
+            const dbRows = await this.farmConfig.getProviders(farmName);
+            if (dbRows && dbRows.length) {
+                return dbRows.map(row => {
+                    const registryEntry = this.registry.providers?.[row.providerId] || {};
+                    return {
+                        id: row.providerId,
+                        ...registryEntry,
+                        // DB overrides take precedence over registry defaults
+                        ...(row.apimPathOverride ? { apimPath: row.apimPathOverride } : {}),
+                        ...(row.keyVaultNameOverride ? { _keyVaultNameOverride: row.keyVaultNameOverride } : {})
+                    };
+                });
+            }
+        } catch (err) {
+            console.warn(`[SensorAPI] DB provider lookup failed for "${farmName}": ${err.message}`);
+        }
+
+        // 2. Fall back to JSON farmProviders map
         const farmList = this.registry.farmProviders?.[farmName];
         if (farmList && farmList.length) {
             return farmList
                 .map(id => ({ id, ...this.registry.providers[id] }))
                 .filter(p => p.name);
         }
-        // Default: return all registered providers
+
+        // 3. Last resort — return all registered providers
         return Object.entries(this.registry.providers)
             .map(([id, info]) => ({ id, ...info }));
     }
@@ -191,7 +217,7 @@ class SensorAPIClient {
      * Each provider uses its own Key Vault secret.
      */
     async getAllProvidersLatest(farmName) {
-        const providers = this.getProvidersForFarm(farmName);
+        const providers = await this.getProvidersForFarm(farmName);
         const results = await Promise.allSettled(
             providers.map(p => this.getLatestReadings(farmName, p.id))
         );

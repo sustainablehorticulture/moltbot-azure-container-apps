@@ -42,16 +42,16 @@ class SensorCommands {
                 case 'list_farms': {
                     const farms = await this.sensor.listFarms();
                     if (!farms.length) return { reply: '📋 No farms found in Site Overview table.' };
-                    const lines = farms.map(f => {
-                        const providers = this.sensor.getProvidersForFarm(f.name);
+                    const farmLines = await Promise.all(farms.map(async f => {
+                        const providers = await this.sensor.getProvidersForFarm(f.name);
                         const providerNames = providers.map(p => p.name || p.id).join(', ');
                         return `• **${f.name}** → Key Vault: \`${f.keyVaultName}\` | APIs: ${providerNames || 'none configured'}`;
-                    });
-                    return { reply: `🌾 **Active Farms (${farms.length})**\n${lines.join('\n')}` };
+                    }));
+                    return { reply: `🌾 **Active Farms (${farms.length})**\n${farmLines.join('\n')}` };
                 }
 
                 case 'list_providers': {
-                    return { reply: this.formatProviderList(farm) };
+                    return { reply: await this.formatProviderList(farm) };
                 }
 
                 case 'all_providers': {
@@ -102,21 +102,28 @@ class SensorCommands {
     }
 
     /**
-     * Build the provider list section for the AI system prompt.
-     * Called by ai-engine.js to inject available providers dynamically.
+     * Build provider list for AI system prompt using JSON registry only (synchronous).
+     * The full DB-driven list is used at request time via getProvidersForFarm().
+     * At prompt-build time we use the JSON farmProviders map as a fast approximation.
      */
     buildProviderPrompt(farmName = null) {
         const farm = farmName || process.env.FARM_ID || 'Grassgum Farm';
-        const providers = this.sensor
-            ? this.sensor.getProvidersForFarm(farm)
-            : [];
+        if (!this.sensor) return '';
 
-        if (!providers.length) return '';
+        // Use JSON registry farmProviders for synchronous prompt building
+        const registry = this.sensor.registry;
+        const farmList = registry.farmProviders?.[farm];
+        const providerIds = farmList && farmList.length
+            ? farmList
+            : Object.keys(registry.providers || {});
 
-        const lines = providers.map(p =>
-            `- ${p.id}: ${p.name} — ${p.description}`
-        );
-        return `\n\nAvailable sensor providers for ${farm}:\n${lines.join('\n')}\nUse these exact provider IDs in the sensor_api JSON action.`;
+        if (!providerIds.length) return '';
+
+        const lines = providerIds.map(id => {
+            const p = registry.providers?.[id];
+            return p ? `- ${id}: ${p.name} — ${p.description}` : `- ${id}`;
+        });
+        return `\n\nAvailable sensor providers for ${farm}:\n${lines.join('\n')}\nUse these exact provider IDs in the sensor_api JSON action. Omit provider to query all.`;
     }
 
     // ── Formatting ─────────────────────────────────────────────────────────
@@ -207,9 +214,9 @@ class SensorCommands {
         return out;
     }
 
-    formatProviderList(farmName) {
+    async formatProviderList(farmName) {
         if (!this.sensor) return '⚠️ Sensor API not configured.';
-        const providers = this.sensor.getProvidersForFarm(farmName);
+        const providers = await this.sensor.getProvidersForFarm(farmName);
         if (!providers.length) return `📋 No sensor providers configured for **${farmName}**.`;
         const lines = providers.map(p =>
             `• **${p.name || p.id}** (\`${p.id}\`) — ${p.description || 'No description'}`

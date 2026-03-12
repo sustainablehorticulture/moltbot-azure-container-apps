@@ -88,6 +88,54 @@ class FarmConfig {
         return farms;
     }
 
+    /**
+     * Get the list of sensor API providers configured for a farm.
+     * Reads from the `IoT Infrastructure` table in zerosumag — written by Trevor
+     * when provisioning a new farm's APIM APIs and Key Vault.
+     *
+     * Table schema (Trevor creates this):
+     *   [dbo].[IoT Infrastructure]
+     *     FarmName    NVARCHAR(100)   -- matches Site Overview.Name
+     *     ProviderId  NVARCHAR(50)    -- e.g. "selectronic", "wattwatchers"
+     *     APIMPath    NVARCHAR(200)   -- optional override of registry apimPath
+     *     KeyVaultName NVARCHAR(100)  -- optional override of derived KV name
+     *     Enabled     BIT             -- 1 = active
+     *
+     * Falls back to JSON registry farmProviders if table doesn't exist yet.
+     */
+    async getProviders(farmName) {
+        const cacheKey = `providers:${farmName.toLowerCase()}`;
+        const cached = this.cache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < this.cacheTTL) return cached.config;
+
+        let providers = [];
+
+        try {
+            const rows = await this.db.query(
+                `SELECT ProviderId, APIMPath, KeyVaultName
+                 FROM [dbo].[IoT Infrastructure]
+                 WHERE FarmName = @FarmName AND Enabled = 1
+                 ORDER BY ProviderId`,
+                [{ name: 'FarmName', value: farmName }],
+                'zerosumag'
+            );
+            if (rows && rows.length) {
+                providers = rows.map(r => ({
+                    providerId: r.ProviderId,
+                    apimPathOverride: r.APIMPath || null,
+                    keyVaultNameOverride: r.KeyVaultName || null
+                }));
+                console.log(`[FarmConfig] IoT Infrastructure: ${farmName} has ${providers.length} provider(s): ${providers.map(p => p.providerId).join(', ')}`);
+            }
+        } catch (err) {
+            // Table may not exist yet — Trevor creates it when provisioning
+            console.warn(`[FarmConfig] IoT Infrastructure table not available for "${farmName}": ${err.message}`);
+        }
+
+        this.cache.set(cacheKey, { config: providers, ts: Date.now() });
+        return providers;
+    }
+
     clearCache() {
         this.cache.clear();
     }
