@@ -1,0 +1,195 @@
+{
+  "_comment": "Agentic Ag course registry. sourceFile paths are resolved from COURSE_CONTENT_PATH env var (default: dashboard project folder). Red Dog loads these at runtime — no content duplication.",
+
+  "contentBasePath": "C:/Users/sscau/OneDrive/Documents/Cascade Projects/Dashboards/Dash  Agentic Ag/sustainablehorticulture-telem-dashboard-clean",
+
+  "studentProfiles": {
+    "beginner":     { "label": "Beginner / Curious",       "description": "No farming or tech background. Use plain language, analogies, and short questions." },
+    "farmer":       { "label": "Working Farmer",            "description": "Practical, hands-on mindset. Focus on real-world applications and outcomes." },
+    "student":      { "label": "School / Uni Student",      "description": "Academic background. Can handle structured content and theory-to-practice links." },
+    "technical":    { "label": "Technical / IT",            "description": "Understands data, APIs, and systems. Focus on architecture, integrations, and data flows." },
+    "professional": { "label": "Agribusiness Professional", "description": "Business and industry context. Focus on ROI, compliance, carbon, and market opportunity." },
+    "sprouts":      { "label": "Young Learner (Sprouts)",   "description": "School-age learner. Use games, simple language, fun farm facts, and visual descriptions." }
+  },
+
+  "courses": [
+    {
+      "id": "dashboard-intro",
+      "title": "Agentic Ag Dashboard — Getting Started",
+      "tagline": "Your digital farm command centre",
+      "level": "beginner",
+      "duration": "30 min",
+      "category": "platform",
+      "tags": ["dashboard", "login", "navigation", "overview"],
+      "sourceFile": "DASHBOARD-USER-GUIDE.md",
+      "sourceSections": ["Getting Started", "Landing Page", "Navigation"],
+      "modules": [
+        { "id": "m1", "title": "What is the Agentic Ag Dashboard?",    "section": "Introduction" },
+        { "id": "m2", "title": "Logging in and navigating",            "section": "Getting Started" },
+        { "id": "m3", "title": "Reading the Landing Page",             "section": "Landing Page" }
+      ]
+    },
+    {
+      "id": "farmyard-energy",
+      "title": "Farm Energy Monitoring",
+      "tagline": "Solar, battery, grid — know your numbers",
+      "level": "intermediate",
+      "duration": "45 min",
+      "category": "energy",
+      "tags": ["energy", "solar", "battery", "wattwatchers", "selectronic", "off-grid"],
+      "sourceFile": "DASHBOARD-USER-GUIDE.md",
+      "supplementFiles": ["README-ENERGY-MONITORING.md", "README-VICTRON-INTEGRATION.md", "README-RENOGY-INTEGRATION.md"],
+      "sourceSections": ["Energy", "Generation and Storage", "Monitoring"],
+      "modules": [
+        { "id": "m1", "title": "Solar generation and battery storage",  "section": "Energy" },
+        { "id": "m2", "title": "Reading energy flow in real time",      "section": "Monitoring" },
+        { "id": "m3", "title": "Off-grid systems: Selectronic SP-PRO", "section": "Battery" },
+        { "id": "m4", "title": "Circuit-level monitoring: WattWatchers","section": "Monitoring" }
+      ]
+    },
+    {
+      "id": "farmyard-soil-climate",
+      "title": "Soil, Climate and Water",
+      "tagline": "The living farm beneath your feet",
+      "level": "intermediate",
+      "duration": "40 min",
+      "category": "environment",
+      "tags": ["soil", "climate", "water", "irrigation", "sensors", "IoT"],
+      "sourceFile": "DASHBOARD-USER-GUIDE.md",
+      "sourceSections": ["Climate", "Water", "Soil", "Plants"],
+      "modules": [
+        { "id": "m1", "title": "Reading soil moisture and health data", "section": "Soil" },
+        { "id": "m2", "title": "Climate monitoring and weather data",   "section": "Climate" },
+        { "id": "m3", "title": "Water and irrigation management",       "section": "Water" },
+        { "id": "m4", "title": "Plant health and NDVI tracking",        "section": "Plants" }
+      ]
+    },
+    {
+      "id": "ai-agents",
+      "title": "Working with AI Agents",
+      "tagline": "Red Dog, Trevor, and Daisy Bell at your service",
+      "level": "beginner",
+      "duration": "30 min",
+      "category": "agents",
+      "tags": ["AI", "agents", "Red Dog", "Trevor", "Daisy Bell", "chat"],
+      "sourceFile": "DASHBOARD-USER-GUIDE.md",
+      "sourceSections": ["AI Agents", "Red Dog", "Trevor Tractor", "Daisy Bell"],
+      "modules": [
+        { "id": "m1", "title": "What AI agents can do for the farm",    "section": "AI Agents" },
+        { "id": "m2", "title": "Asking Red Dog for farm data",          "section": "Red Dog" },
+        { "id": "m3", "title": "Using Trevor for field operations",     "section": "Trevor Tractor" },
+        { "id": "m4", "title": "Daisy Bell for livestock",             "section": "Daisy Bell" }
+      ]
+    },
+    {
+      "id": "silo-management",
+      "title": "The Silo — Projects, Audits and Tool Shed",
+      "tagline": "Farm management for the serious operator",
+      "level": "advanced",
+      "duration": "60 min",
+      "category": "management",
+      "tags": ["silo", "projects", "audits", "compliance", "tool shed", "carbon", "biodiversity"],
+      "sourceFile": "DASHBOARD-USER-GUIDE.md",
+      "sourceSections": ["The Silo", "Projects", "Audits", "Tool Shed"],
+      "modules": [
+        { "id": "m1", "title": "Unlocking and navigating the Silo",    "section": "The Silo" },
+        { "id": "m2", "title": "Project and capital tracking",         "section": "Projects" },
+        { "id": "m3", "title": "Compliance audits and certifications", "section": "Audits" },
+        { "id": "m4", "title": "Tool Shed — advanced farm controls",   "section": "Tool Shed" }
+      ]
+    },
+    {
+      "id": "sustainable-farming",
+      "title": "Sustainable Farming Practices",
+      "tagline": "Grow more, tread lighter",
+      "level": "beginner",
+      "duration": "6 weeks",
+      "price": 299,
+      "category": "online",
+      "tags": ["sustainability", "regenerative", "soil carbon", "biodiversity", "farming practices"],
+      "sourceFile": "DASHBOARD-USER-GUIDE.md",
+      "sourceSections": ["Education", "Market Place"],
+      "modules": [
+        { "id": "m1", "title": "Principles of regenerative agriculture","section": "Education" },
+        { "id": "m2", "title": "Soil carbon and sequestration",         "section": "Projects" },
+        { "id": "m3", "title": "Biodiversity on the farm",             "section": "Ecology" },
+        { "id": "m4", "title": "Water-smart farming",                  "section": "Water" },
+        { "id": "m5", "title": "Measuring and reporting sustainability","section": "Audits" }
+      ]
+    },
+    {
+      "id": "precision-agriculture",
+      "title": "Precision Agriculture Fundamentals",
+      "tagline": "Data-driven farming from paddock to cloud",
+      "level": "intermediate",
+      "duration": "6 weeks",
+      "price": 279,
+      "category": "online",
+      "tags": ["IoT", "sensors", "LoRaWAN", "data", "precision", "TTN", "analytics"],
+      "sourceFile": "MODULAR-API-INTEGRATION.md",
+      "supplementFiles": ["DASHBOARD-USER-GUIDE.md", "TOOLSHED_DATABASE_TABLES.md"],
+      "modules": [
+        { "id": "m1", "title": "IoT sensors and LoRaWAN networks",     "section": "IoT" },
+        { "id": "m2", "title": "Reading and interpreting sensor data",  "section": "Sensors" },
+        { "id": "m3", "title": "Connecting data to farm decisions",     "section": "Analytics" },
+        { "id": "m4", "title": "Automation and alerts",                "section": "Alerts" },
+        { "id": "m5", "title": "API integrations and data flows",      "section": "API" }
+      ]
+    },
+    {
+      "id": "off-grid-energy",
+      "title": "Off-Grid Energy Systems",
+      "tagline": "Power the farm without the grid",
+      "level": "advanced",
+      "duration": "8.5 hours",
+      "price": 499,
+      "category": "online",
+      "tags": ["off-grid", "solar", "battery", "inverter", "energy management", "Selectronic"],
+      "sourceFile": "README-ENERGY-MONITORING.md",
+      "supplementFiles": ["README-VICTRON-INTEGRATION.md", "README-RENOGY-INTEGRATION.md"],
+      "modules": [
+        { "id": "m1", "title": "Off-grid solar design principles",      "section": "Solar" },
+        { "id": "m2", "title": "Battery systems and state of charge",   "section": "Battery" },
+        { "id": "m3", "title": "Inverter systems: Selectronic SP-PRO", "section": "Inverter" },
+        { "id": "m4", "title": "Monitoring with Wattwatchers",          "section": "Monitoring" },
+        { "id": "m5", "title": "Energy auditing and optimisation",      "section": "Audit" }
+      ]
+    },
+    {
+      "id": "sprouts",
+      "title": "Sprouts Digital Learning Program",
+      "tagline": "Fun farm adventures for young learners!",
+      "level": "beginner",
+      "duration": "10 weeks",
+      "price": 0,
+      "category": "online",
+      "targetAudience": "sprouts",
+      "tags": ["kids", "school", "young learners", "fun", "farm animals", "plants", "nature"],
+      "sourceFile": "DASHBOARD-USER-GUIDE.md",
+      "sourceSections": ["Education"],
+      "modules": [
+        { "id": "m1", "title": "Welcome to the farm!",                  "section": "Introduction" },
+        { "id": "m2", "title": "Where does our food come from?",        "section": "Plants" },
+        { "id": "m3", "title": "Farm animals and their jobs",           "section": "Livestock" },
+        { "id": "m4", "title": "Sun, rain, and seasons",               "section": "Climate" },
+        { "id": "m5", "title": "How technology helps farmers",          "section": "Technology" }
+      ]
+    },
+    {
+      "id": "farmg8-marketplace",
+      "title": "FarmG8 — Market, Eco-Stay and Education",
+      "tagline": "The farm's commercial and community hub",
+      "level": "beginner",
+      "duration": "30 min",
+      "category": "platform",
+      "tags": ["marketplace", "eco-stay", "products", "agritourism", "carbon credits", "biodiversity credits"],
+      "sourceFile": "DASHBOARD-USER-GUIDE.md",
+      "sourceSections": ["FarmG8", "Market Place", "Eco-Stay", "Education"],
+      "modules": [
+        { "id": "m1", "title": "Farm products and the marketplace",     "section": "Market Place" },
+        { "id": "m2", "title": "Eco-Stay and farm tourism",            "section": "Eco-Stay" },
+        { "id": "m3", "title": "Course bookings and education",        "section": "Education" }
+      ]
+    }
+  ]
+}

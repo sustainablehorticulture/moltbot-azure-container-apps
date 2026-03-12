@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const BillingSystem = require('./billing-system');
+const CourseTeacher = require('./course-teacher');
 
 class APIServer {
     constructor(aiEngine, db, blobStorage, serviceBus, approvalManager, socialMedia, deviceCommands = null, sensorCommands = null) {
@@ -13,6 +14,7 @@ class APIServer {
         this.deviceCommands = deviceCommands;
         this.sensorCommands = sensorCommands;
         this.billing = new BillingSystem({ db });
+        this.courseTeacher = new CourseTeacher({ apiKey: process.env.OPENROUTER_API_KEY, model: process.env.OPENROUTER_MODEL });
         this.app = express();
         this.port = process.env.API_PORT || process.env.GATEWAY_PORT || 3001;
         this.setupMiddleware();
@@ -206,6 +208,12 @@ class APIServer {
                         category: 'agents'
                     },
                     {
+                        id: 'courses',
+                        label: '🎓 Start a Course',
+                        message: 'Show me available courses on Agentic Ag',
+                        category: 'education'
+                    },
+                    {
                         id: 'social',
                         label: '✨ Show off — post some tricks',
                         message: null,
@@ -219,6 +227,62 @@ class APIServer {
                     }
                 ]
             });
+        });
+
+        // ── Course Teacher Endpoints ──────────────────────────────────────────
+
+        this.app.get('/api/courses', (req, res) => {
+            res.json({ courses: this.courseTeacher.listCourses(req.query.category || null) });
+        });
+
+        this.app.get('/api/courses/:courseId', (req, res) => {
+            const course = this.courseTeacher.getCourse(req.params.courseId);
+            if (!course) return res.status(404).json({ error: 'Course not found' });
+            res.json(course);
+        });
+
+        this.app.post('/api/courses/session', (req, res) => {
+            try {
+                const { userId, courseId, background } = req.body;
+                if (!userId || !courseId) return res.status(400).json({ error: 'userId and courseId required' });
+                const result = this.courseTeacher.startSession(userId, courseId, background || 'beginner');
+                res.json({ started: true, course: result.course.title, profile: result.profile.label, modules: result.course.modules.length });
+            } catch (e) { res.status(400).json({ error: e.message }); }
+        });
+
+        this.app.get('/api/courses/session/:userId', (req, res) => {
+            const session = this.courseTeacher.getSession(req.params.userId);
+            if (!session) return res.status(404).json({ error: 'No active session' });
+            const course = this.courseTeacher.getCourse(session.courseId);
+            res.json({ session, courseTitle: course?.title });
+        });
+
+        this.app.delete('/api/courses/session/:userId', (req, res) => {
+            const session = this.courseTeacher.endSession(req.params.userId);
+            res.json({ ended: true, score: session?.score ?? 0, questionsAnswered: session?.questionsAsked?.length ?? 0 });
+        });
+
+        this.app.get('/api/courses/question/:userId', async (req, res) => {
+            try {
+                const q = await this.courseTeacher.generateQuestion(req.params.userId);
+                res.json(q);
+            } catch (e) { res.status(400).json({ error: e.message }); }
+        });
+
+        this.app.post('/api/courses/answer/:userId', async (req, res) => {
+            try {
+                const { answer } = req.body;
+                if (!answer) return res.status(400).json({ error: 'answer required' });
+                const result = await this.courseTeacher.evaluateAnswer(req.params.userId, answer);
+                res.json(result);
+            } catch (e) { res.status(400).json({ error: e.message }); }
+        });
+
+        this.app.get('/api/courses/:courseId/teacher-prompts', async (req, res) => {
+            try {
+                const result = await this.courseTeacher.getTeacherPrompts(req.params.courseId, req.query.background || 'farmer', parseInt(req.query.count) || 5);
+                res.json(result);
+            } catch (e) { res.status(500).json({ error: e.message }); }
         });
 
         // Chat endpoint — send a message, get an AI response (with optional DB queries)

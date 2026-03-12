@@ -246,6 +246,20 @@ Social action fields:
 - recipients: (whatsapp only) list of recipient numbers if known, otherwise omit
 
 Always draft compelling content based on any recent farm data you have. If posting, suggest a suitable image description too.
+
+When the user asks about courses, education, learning, or wants to start a lesson, respond with:
+{"action": "course_action", "type": "<type>", "courseId": "<id>", "background": "<profile>"}
+
+Course action types:
+- "list" — show available courses (no courseId needed)
+- "start" — begin a course session (requires courseId, background: beginner|farmer|student|technical|professional|sprouts)
+- "question" — get the next question in the current session
+- "teacher_prompts" — get teacher prompt suggestions for a course (requires courseId)
+
+Student backgrounds: beginner, farmer, student, technical, professional, sprouts (kids)
+Available course IDs: dashboard-intro, farmyard-energy, farmyard-soil-climate, ai-agents, silo-management, sustainable-farming, precision-agriculture, off-grid-energy, sprouts, farmg8-marketplace
+
+Always detect the user's likely background from context and suggest the most relevant course.
 `;
 
         // Inject available sensor providers dynamically from registry
@@ -291,6 +305,14 @@ Always draft compelling content based on any recent farm data you have. If posti
         }
 
         return prompt;
+    }
+
+    _getCourseTeacher() {
+        if (!this._courseTeacher) {
+            const CourseTeacher = require('./course-teacher');
+            this._courseTeacher = new CourseTeacher({ apiKey: this.apiKey, model: this.model });
+        }
+        return this._courseTeacher;
     }
 
     isUnsafeQuery(sql) {
@@ -414,7 +436,40 @@ Always draft compelling content based on any recent farm data you have. If posti
                 } catch (_) {}
             }
 
-            // Step 2d: Check if AI wants to run a query
+            // Step 2d: Check if AI wants to run a course action
+            const courseMatch = aiReply.match(/\{[\s\S]*?"action"\s*:\s*"course_action"[\s\S]*?\}/);
+            if (courseMatch) {
+                try {
+                    const courseAction = JSON.parse(courseMatch[0]);
+                    let reply = '';
+                    const courseTeacher = this._getCourseTeacher?.();
+                    if (courseTeacher) {
+                        if (courseAction.type === 'list') {
+                            const courses = courseTeacher.listCourses();
+                            reply = `🎓 **Available Courses on Agentic Ag**\n\n` +
+                                courses.map(c => `**${c.title}** (${c.level}, ${c.duration}${c.price != null ? `, $${c.price || 'Free'}` : ''})\n_${c.tagline}_\nID: \`${c.id}\``).join('\n\n');
+                            reply += `\n\nTell me which one interests ya and I'll get the lesson started, mate! 🐾`;
+                        } else if (courseAction.type === 'start' && courseAction.courseId) {
+                            const result = courseTeacher.startSession(userId, courseAction.courseId, courseAction.background || 'beginner');
+                            reply = `🎓 Righto! Starting **${result.course.title}** for you.\n_Student profile: ${result.profile.label}_\n\n${result.profile.description}\n\nSay **"next question"** to get your first question, or **"teacher prompts"** if you're running a class! 🐾`;
+                        } else if (courseAction.type === 'question') {
+                            const q = await courseTeacher.generateQuestion(userId);
+                            const opts = q.options ? `\n\n${q.options.join('\n')}` : '';
+                            reply = `🐾 _${q.voicePrompt}_\n\n**${q.question}**${opts}\n\n_Hint: ${q.hint}_`;
+                        } else if (courseAction.type === 'teacher_prompts' && courseAction.courseId) {
+                            const result = await courseTeacher.getTeacherPrompts(courseAction.courseId, courseAction.background || 'farmer');
+                            reply = `👨‍🏫 **Teacher Prompts — ${courseAction.courseId}**\n\n` +
+                                (result.prompts || []).map((p, i) => `**${i + 1}. [${p.type}]** ${p.prompt}\n_Purpose: ${p.purpose}_`).join('\n\n');
+                        }
+                    }
+                    if (!reply) reply = aiReply;
+                    await this.addToHistory(userId, 'user', userMessage);
+                    await this.addToHistory(userId, 'assistant', reply);
+                    return { reply, courseAction };
+                } catch (_) {}
+            }
+
+            // Step 2e: Check if AI wants to run a query
             const queryMatch = aiReply.match(/\{[\s\S]*?"action"\s*:\s*"query"[\s\S]*?\}/);
             if (queryMatch && this.db && this.db.isConnected) {
                 try {
