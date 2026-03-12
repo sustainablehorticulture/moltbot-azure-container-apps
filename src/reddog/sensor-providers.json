@@ -64,8 +64,9 @@
 
     "the_things_network": {
       "name": "The Things Network (TTN/LoRaWAN)",
-      "description": "LoRaWAN uplink data from TTN v3. Receives decoded sensor payloads from field devices (soil, weather, relay nodes) via APIM webhook. Also supports MQTT at au1.cloud.thethings.network:8883.",
-      "apimPath": "/webhooks/ttn",
+      "description": "LoRaWAN uplink data from TTN v3. Real-time latest uplink fetched via TTN Storage Integration REST API (requires Storage Integration enabled on TTN application). Also supports MQTT at au1.cloud.thethings.network:8883.",
+      "apimPath": "/lorawan",
+      "backendLatestPath": "/sites/{siteId}/latest/{deviceId?}",
       "backendUrl": "https://reddog.azure-api.net",
       "backendPaths": {
         "uplink": "/webhooks/ttn/{applicationId}/uplink",

@@ -3,6 +3,7 @@ const { app } = require('@azure/functions');
 // Import LoRaWAN services
 const lt2222Service = require('../services/lt2222Service');
 const deviceManager = require('../services/deviceManager');
+const ttnService = require('../services/ttnService');
 
 // Multi-site LoRaWAN device control with privacy isolation
 app.http('lorawanControl', {
@@ -49,6 +50,9 @@ app.http('lorawanControl', {
 
                 case 'uplink':
                     return await handleUplink(request, context, siteId);
+
+                case 'latest':
+                    return await handleLatest(request, context, siteId, deviceId);
 
                 case 'schedules':
                     return await handleScheduleManagement(request, context, siteId, deviceId, method);
@@ -454,5 +458,29 @@ async function handleScheduleManagement(request, context, siteId, scheduleId, me
                     message: 'Only GET, POST, PUT, DELETE methods are supported'
                 }
             };
+    }
+}
+
+async function handleLatest(request, context, siteId, deviceId) {
+    try {
+        if (deviceId) {
+            const reading = await ttnService.getDeviceLatest(siteId, deviceId);
+            if (!reading) {
+                return {
+                    status: 404,
+                    jsonBody: { error: 'Not Found', message: `No stored uplink found for device ${deviceId}`, siteId, deviceId }
+                };
+            }
+            return { status: 200, jsonBody: { siteId, deviceId, reading, timestamp: new Date().toISOString() } };
+        } else {
+            const readings = await ttnService.getAllLatest(siteId);
+            return {
+                status: 200,
+                jsonBody: { siteId, readings, total: readings.length, timestamp: new Date().toISOString() }
+            };
+        }
+    } catch (e) {
+        context.log.error('TTN latest error:', e.message);
+        return { status: 500, jsonBody: { error: 'TTN fetch failed', message: e.message, siteId } };
     }
 }

@@ -229,13 +229,11 @@ class SelectronicService {
     _normalise(raw) {
         if (!raw || typeof raw !== 'object') return raw;
 
-        const out = {};
-        for (const [key, value] of Object.entries(raw)) {
-            // Fields ending in _wh_ are reported in kWh despite the name
-            const label = key.includes('_wh_') ? key.replace('_wh_', '_kwh_') : key;
-            out[label] = value;
-        }
-        return out;
+        const items = raw.items || raw;
+        return {
+            battery_soc: items.battery_soc,
+            load_w: items.load_w
+        };
     }
 }
 
