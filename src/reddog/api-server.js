@@ -5,6 +5,8 @@ const CourseTeacher = require('./course-teacher');
 const SmartChecks = require('./smart-checks');
 const metaWebhooksRoute = require('./routes/meta-webhooks');
 const socialMediaRoute = require('./routes/social-media');
+const marketingRoute = require('./routes/marketing');
+const FarmContent = require('./farm-content');
 
 class APIServer {
     constructor(aiEngine, db, blobStorage, serviceBus, approvalManager, socialMedia, deviceCommands = null, sensorCommands = null) {
@@ -19,6 +21,7 @@ class APIServer {
         this.billing = new BillingSystem({ db });
         this.courseTeacher = new CourseTeacher({ apiKey: process.env.OPENROUTER_API_KEY, model: process.env.OPENROUTER_MODEL });
         this.smartChecks = new SmartChecks(sensorCommands);
+        this.farmContent = new FarmContent(db);
         this.app = express();
         this.port = process.env.API_PORT || process.env.GATEWAY_PORT || 3001;
         this.setupMiddleware();
@@ -39,12 +42,15 @@ class APIServer {
 
     setupRoutes() {
         // ── Meta Webhooks (must be before other routes for rawBody) ────────
-        this.app.use('/api/webhooks/meta', metaWebhooksRoute(this.socialMedia, this.aiEngine));
+        this.app.use('/api/webhooks/meta', metaWebhooksRoute(this.socialMedia, this.aiEngine, this.farmContent));
 
         // ── Social Media Routes ───────────────────────────────────────────────
         if (this.socialMedia) {
             this.app.use('/api/social', socialMediaRoute(this.socialMedia));
         }
+
+        // ── Marketing Routes ─────────────────────────────────────────────────
+        this.app.use('/api/marketing', marketingRoute(this.farmContent, this.aiEngine));
 
         // Health check
         this.app.get('/health', (req, res) => {

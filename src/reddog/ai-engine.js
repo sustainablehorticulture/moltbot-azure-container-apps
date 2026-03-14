@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const TopicManager = require('./topic-manager');
 const KnowledgeGraph = require('./knowledge-graph');
+const FarmContent = require('./farm-content');
 
 class AIEngine {
     constructor(db, billing = null, blobStorage = null, serviceBus = null, approvalManager = null, deviceCommands = null, sensorCommands = null) {
@@ -24,6 +25,9 @@ class AIEngine {
         this.knowledgeGraph = new KnowledgeGraph();
         this.farmId = process.env.FARM_ID || 'grassgum'; // Default farm identifier
         this.persistentChatEnabled = process.env.PERSISTENT_CHAT_ENABLED !== 'false'; // Enabled by default
+        this.farmContent = new FarmContent(db);
+        this._farmContextCache = null;
+        this._farmContextTs = 0;
         this.autoSaveInterval = parseInt(process.env.CHAT_AUTOSAVE_INTERVAL) || 5; // Save every 5 messages
         this.messagesSinceLastSave = new Map(); // Track messages since last save per user
         
@@ -315,6 +319,24 @@ Conditional control examples:
         return prompt;
     }
 
+    /**
+     * Get cached farm marketing context (refreshes every 5 minutes)
+     */
+    async _getFarmContext() {
+        const TTL = 5 * 60 * 1000;
+        if (this._farmContextCache && (Date.now() - this._farmContextTs) < TTL) {
+            return this._farmContextCache;
+        }
+        try {
+            this._farmContextCache = await this.farmContent.buildMarketingContext();
+            this._farmContextTs = Date.now();
+        } catch (err) {
+            console.warn('[AI] Farm context fetch failed:', err.message);
+            this._farmContextCache = '';
+        }
+        return this._farmContextCache;
+    }
+
     _getCourseTeacher() {
         if (!this._courseTeacher) {
             const CourseTeacher = require('./course-teacher');
@@ -373,7 +395,8 @@ Conditional control examples:
                 }
             }
 
-            const systemPrompt = this.buildSystemPrompt();
+            const farmContext = await this._getFarmContext();
+            const systemPrompt = this.buildSystemPrompt() + (farmContext ? `\n${farmContext}` : '');
             const history = await this.getHistory(userId);
 
             // Add topic context to user message if topics detected

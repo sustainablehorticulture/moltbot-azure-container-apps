@@ -21,7 +21,7 @@ const express = require('express');
 const crypto  = require('crypto');
 const router  = express.Router();
 
-module.exports = (socialMedia, aiEngine) => {
+module.exports = (socialMedia, aiEngine, farmContent = null) => {
 
     // ── Signature verification helper ─────────────────────────────────────
 
@@ -228,7 +228,12 @@ async function handleWhatsAppEvents(entries, socialMedia, aiEngine) {
                     console.log(`[MetaWebhook] WhatsApp from=${from}: "${text}"`);
 
                     try {
-                        const replyText = await getAIReply(text, `whatsapp:${from}`, aiEngine);
+                        // Try smart product/eco-stay/course reply first
+                        const smartReply = farmContent
+                            ? await getSmartReply(text, from, farmContent)
+                            : null;
+
+                        const replyText = smartReply || await getAIReply(text, `whatsapp:${from}`, aiEngine);
                         await socialMedia.sendWhatsAppMessage(from, replyText);
                     } catch (err) {
                         console.error(`[MetaWebhook] WhatsApp reply failed for ${from}:`, err.message);
@@ -253,6 +258,55 @@ async function handleWhatsAppEvents(entries, socialMedia, aiEngine) {
             }
         }
     }
+}
+
+/**
+ * Detect product/eco-stay/course inquiries and return instant data-backed replies.
+ * Returns null if the message doesn't match a known inquiry pattern.
+ */
+async function getSmartReply(text, from, farmContent) {
+    const t = text.toLowerCase().trim();
+
+    // Product availability / price inquiry
+    const buyKeywords = ['price', 'cost', 'buy', 'order', 'stock', 'available', 'how much', 'do you have', 'sell', 'get some', 'purchase'];
+    if (buyKeywords.some(k => t.includes(k))) {
+        try {
+            const products = await farmContent.getAvailableProducts();
+            // Try to match a product name in the message
+            const matched = products.find(p => t.includes(p.name.toLowerCase()) || t.includes(p.id.toLowerCase()));
+            if (matched) {
+                const qty = (t.match(/(\d+)\s*(kg|dozen|bottle|side|litre|l\b)/i) || [])[1] || 1;
+                const quote = await farmContent.getProductQuote(matched.name, parseInt(qty));
+                return quote.message;
+            }
+            // No specific product — list available
+            const topProducts = products.slice(0, 6).map(p => `• ${p.name}: $${p.price}/${p.unit}`).join('\n');
+            return `G'day! Here's what's available at Grassgum Farm right now:\n\n${topProducts}\n\nReply with a product name to get a quote! 🐕`;
+        } catch { return null; }
+    }
+
+    // Eco-stay / accommodation inquiry
+    if (['stay', 'book', 'cabin', 'accommodation', 'glamping', 'farmhouse', 'eco', 'lodge', 'cottage', 'loft', 'night'].some(k => t.includes(k))) {
+        try {
+            const stays = await farmContent.getEcoStay();
+            if (!stays.length) return null;
+            const lines = stays.map(s => `• ${s.name} — $${s.pricePerNight}/night, sleeps ${s.capacity}. ${s.nextAvailable || 'Available now'}`).join('\n');
+            return `🏡 Grassgum Farm Eco-Stay options:\n\n${lines}\n\nSend your check-in date to check availability!`;
+        } catch { return null; }
+    }
+
+    // Course inquiry
+    if (['course', 'learn', 'training', 'workshop', 'class', 'education', 'study', 'online'].some(k => t.includes(k))) {
+        try {
+            const courses = farmContent.getCourses();
+            if (!courses.length) return null;
+            const lines = courses.slice(0, 5).map(c => `• ${c.title} (${c.level}) — ${c.duration}${c.price ? ` — $${c.price}` : ' — Free'}`).join('\n');
+            return `🎓 Grassgum Farm Courses:\n\n${lines}\n\nVisit FarmG8 to enrol or ask me about any course!`;
+        } catch { return null; }
+    }
+
+    // Not a recognized inquiry — fall through to AI
+    return null;
 }
 
 async function getAIReply(userMessage, sessionId, aiEngine) {
