@@ -298,7 +298,7 @@ class BlobStorageManager {
      * @param {number} maxResults - Max images to return (default 20)
      * @returns {Array} [{ name, url, sasUrl, contentType, size, lastModified }]
      */
-    async getFarmMedia(container = 'farm-media', prefix = '', maxResults = 20) {
+    async getFarmMedia(container = 'farmmedia', prefix = '', maxResults = 20) {
         if (!this.isConnected) throw new Error('Blob storage not connected');
 
         const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic'];

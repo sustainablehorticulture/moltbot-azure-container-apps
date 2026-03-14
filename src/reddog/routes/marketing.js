@@ -239,9 +239,27 @@ Generate ONE great ${platform} post now. Do not include any prefix like "Here's 
             return res.status(503).json({ error: 'Blob storage not available' });
         }
         try {
-            const { container = 'farm-media', prefix = '', max = 20 } = req.query;
-            const images = await blobStorage.getFarmMedia(container, prefix, parseInt(max));
-            res.json({ images, count: images.length, container, prefix });
+            const { container, prefix = '', max = 20 } = req.query;
+
+            if (container) {
+                // Single container requested
+                const images = await blobStorage.getFarmMedia(container, prefix, parseInt(max));
+                return res.json({ images, count: images.length, container, prefix });
+            }
+
+            // Default: combine both grassgumfarm containers
+            const FARM_CONTAINERS = ['farmmedia', 'containerdroneimagery'];
+            const all = [];
+            for (const c of FARM_CONTAINERS) {
+                try {
+                    const imgs = await blobStorage.getFarmMedia(c, prefix, parseInt(max));
+                    imgs.forEach(i => { i.container = c; });
+                    all.push(...imgs);
+                } catch {
+                    // container may not exist in this storage account — skip
+                }
+            }
+            res.json({ images: all, count: all.length, containers: FARM_CONTAINERS, prefix });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
