@@ -7,6 +7,25 @@
 const express = require('express');
 const router = express.Router();
 
+/**
+ * Confirmation gate — applied to every outbound publish action.
+ * If the caller does not include confirmed:true in the body, the request is
+ * returned as a draft preview with a prompt to confirm before publishing.
+ */
+function requireConfirmation(label) {
+    return (req, res, next) => {
+        if (req.body && req.body.confirmed === true) return next();
+        const { confirmed: _drop, ...draft } = req.body || {};
+        return res.status(202).json({
+            status:   'awaiting_confirmation',
+            platform: label,
+            draft,
+            warning:  `⚠️ Red Dog has NOT posted yet. Review the content above, then re-send this request with \"confirmed\": true to publish.`,
+            confirmWith: { ...draft, confirmed: true }
+        });
+    };
+}
+
 module.exports = (socialMedia) => {
     // ─── OAuth Authentication ───
 
@@ -145,7 +164,7 @@ module.exports = (socialMedia) => {
      * POST /api/social/instagram/post
      * Create an Instagram post
      */
-    router.post('/instagram/post', async (req, res) => {
+    router.post('/instagram/post', requireConfirmation('instagram'), async (req, res) => {
         const userId = req.body.userId || req.headers['x-user-id'];
         const { caption, imageUrl, mediaType } = req.body;
 
@@ -171,7 +190,7 @@ module.exports = (socialMedia) => {
      * POST /api/social/facebook/post
      * Create a Facebook post
      */
-    router.post('/facebook/post', async (req, res) => {
+    router.post('/facebook/post', requireConfirmation('facebook'), async (req, res) => {
         const userId = req.body.userId || req.headers['x-user-id'];
         const { message, link, imageUrl, pageId } = req.body;
 
@@ -195,7 +214,7 @@ module.exports = (socialMedia) => {
      * POST /api/social/facebook/ad
      * Create a Facebook ad campaign
      */
-    router.post('/facebook/ad', async (req, res) => {
+    router.post('/facebook/ad', requireConfirmation('facebook-ad'), async (req, res) => {
         const userId = req.body.userId || req.headers['x-user-id'];
         const { campaignName, adSetName, adName, targeting, creative, budget } = req.body;
 
@@ -240,7 +259,7 @@ module.exports = (socialMedia) => {
      * Share content on LinkedIn (Share on LinkedIn product — ugcPosts API)
      * Body: { userId, text, link?, linkTitle?, linkDescription?, imageUrl? }
      */
-    router.post('/linkedin/post', async (req, res) => {
+    router.post('/linkedin/post', requireConfirmation('linkedin'), async (req, res) => {
         const userId = req.body.userId || req.headers['x-user-id'];
         const { text, imageUrl, link, linkTitle, linkDescription } = req.body;
 
@@ -262,7 +281,7 @@ module.exports = (socialMedia) => {
      * Send a plain text WhatsApp message
      * Body: { to, text }
      */
-    router.post('/whatsapp/send', async (req, res) => {
+    router.post('/whatsapp/send', requireConfirmation('whatsapp'), async (req, res) => {
         const { to, text } = req.body;
         if (!to || !text) {
             return res.status(400).json({ error: 'to and text are required' });
@@ -280,7 +299,7 @@ module.exports = (socialMedia) => {
      * Send a WhatsApp image, video, document, or audio message
      * Body: { to, type, mediaUrl, caption }
      */
-    router.post('/whatsapp/media', async (req, res) => {
+    router.post('/whatsapp/media', requireConfirmation('whatsapp'), async (req, res) => {
         const { to, type, mediaUrl, caption } = req.body;
         if (!to || !mediaUrl) {
             return res.status(400).json({ error: 'to and mediaUrl are required' });
@@ -298,7 +317,7 @@ module.exports = (socialMedia) => {
      * Send a pre-approved WhatsApp template message (for marketing/outbound)
      * Body: { to, templateName, languageCode, components }
      */
-    router.post('/whatsapp/template', async (req, res) => {
+    router.post('/whatsapp/template', requireConfirmation('whatsapp'), async (req, res) => {
         const { to, templateName, languageCode, components } = req.body;
         if (!to || !templateName) {
             return res.status(400).json({ error: 'to and templateName are required' });
@@ -316,7 +335,7 @@ module.exports = (socialMedia) => {
      * Send a WhatsApp message to multiple recipients
      * Body: { recipients: ["+61400000000", ...], text }
      */
-    router.post('/whatsapp/broadcast', async (req, res) => {
+    router.post('/whatsapp/broadcast', requireConfirmation('whatsapp-broadcast'), async (req, res) => {
         const { recipients, text } = req.body;
         if (!recipients || !Array.isArray(recipients) || !text) {
             return res.status(400).json({ error: 'recipients (array) and text are required' });
@@ -349,7 +368,7 @@ module.exports = (socialMedia) => {
      * Send a Messenger message to a user
      * Body: { recipientId, text }
      */
-    router.post('/messenger/send', async (req, res) => {
+    router.post('/messenger/send', requireConfirmation('messenger'), async (req, res) => {
         const { recipientId, text } = req.body;
         if (!recipientId || !text) {
             return res.status(400).json({ error: 'recipientId and text are required' });
@@ -369,7 +388,7 @@ module.exports = (socialMedia) => {
      * Send a WhatsApp interactive button message
      * Body: { to, bodyText, buttons: [{ id, title }, ...] } (max 3 buttons)
      */
-    router.post('/whatsapp/buttons', async (req, res) => {
+    router.post('/whatsapp/buttons', requireConfirmation('whatsapp'), async (req, res) => {
         const { to, bodyText, buttons } = req.body;
         if (!to || !bodyText || !Array.isArray(buttons)) {
             return res.status(400).json({ error: 'to, bodyText, and buttons (array) are required' });
