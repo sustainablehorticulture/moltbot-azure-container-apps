@@ -299,7 +299,7 @@ class BlobStorageManager {
      * @returns {Array} [{ name, url, sasUrl, contentType, size, lastModified }]
      */
     async getFarmMedia(container = 'farmmedia', prefix = '', maxResults = 20) {
-        const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic'];
+        const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.mp4', '.mov', '.avi'];
 
         // Use dedicated grassgumfarm storage account if configured; fall back to default
         const farmConn = process.env.FARM_MEDIA_STORAGE_CONNECTION_STRING;

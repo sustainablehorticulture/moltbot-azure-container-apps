@@ -248,7 +248,7 @@ Generate ONE great ${platform} post now. Do not include any prefix like "Here's 
             }
 
             // Default: combine both grassgumfarm containers
-            const FARM_CONTAINERS = ['farmmedia', 'containerdroneimagery'];
+            const FARM_CONTAINERS = ['farmmedia', 'droneimagery'];
             const all = [];
             for (const c of FARM_CONTAINERS) {
                 try {
