@@ -56,7 +56,10 @@ class SocialMediaManager {
                 authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
                 tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
                 apiUrl: 'https://api.linkedin.com/v2',
-                scopes: ['w_member_social', 'r_basicprofile', 'r_organization_social']
+                userinfoUrl: 'https://api.linkedin.com/v2/userinfo',
+                // openid+profile+email — Sign In with LinkedIn (OpenID Connect)
+                // w_member_social     — Share on LinkedIn
+                scopes: ['openid', 'profile', 'email', 'w_member_social']
             },
             whatsapp: {
                 name: 'WhatsApp',
@@ -138,15 +141,43 @@ class SocialMediaManager {
         }
 
         try {
-            const response = await axios.post(config.tokenUrl, {
-                client_id: clientId,
-                client_secret: clientSecret,
-                code: code,
-                redirect_uri: redirectUri,
-                grant_type: 'authorization_code'
-            });
+            // LinkedIn requires form-encoded body; other platforms accept JSON
+            let response;
+            if (platform === 'linkedin') {
+                const params = new URLSearchParams({
+                    grant_type:    'authorization_code',
+                    code,
+                    redirect_uri:  redirectUri,
+                    client_id:     clientId,
+                    client_secret: clientSecret
+                });
+                response = await axios.post(config.tokenUrl, params.toString(), {
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
+            } else {
+                response = await axios.post(config.tokenUrl, {
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    code,
+                    redirect_uri: redirectUri,
+                    grant_type: 'authorization_code'
+                });
+            }
 
             const tokenData = response.data;
+
+            // For LinkedIn OIDC — fetch and cache the member URN immediately after auth
+            if (platform === 'linkedin' && tokenData.access_token) {
+                try {
+                    const info = await this._linkedInUserInfo(tokenData.access_token);
+                    tokenData._memberUrn = `urn:li:person:${info.sub}`;
+                    tokenData._name      = info.name || info.given_name;
+                    tokenData._email     = info.email;
+                    console.log(`[SocialMedia] LinkedIn OIDC: member=${tokenData._memberUrn}, email=${tokenData._email}`);
+                } catch (e) {
+                    console.warn('[SocialMedia] LinkedIn userinfo fetch failed:', e.message);
+                }
+            }
             
             // Store tokens in database
             await this.storeTokens(userId, platform, tokenData);
@@ -448,6 +479,92 @@ class SocialMediaManager {
         } catch (error) {
             console.error('[SocialMedia] Facebook ad creation failed:', error.message);
             throw error;
+        }
+    }
+
+    // ─── LinkedIn Posting ───
+
+    /**
+     * Fetch LinkedIn OpenID Connect userinfo
+     */
+    async _linkedInUserInfo(accessToken) {
+        const response = await axios.get('https://api.linkedin.com/v2/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        return response.data; // { sub, name, given_name, family_name, email, picture }
+    }
+
+    /**
+     * Get the LinkedIn member URN for a user (cached in token data, or fetched live)
+     */
+    async _getLinkedInMemberUrn(userId, accessToken) {
+        const cached = this.tokens.get(`${userId}:linkedin`);
+        if (cached && cached._memberUrn) return cached._memberUrn;
+        const info = await this._linkedInUserInfo(accessToken);
+        return `urn:li:person:${info.sub}`;
+    }
+
+    /**
+     * Get LinkedIn profile (OIDC userinfo)
+     * Returns: { sub, name, given_name, family_name, email, picture }
+     */
+    async getLinkedInProfile(userId) {
+        const accessToken = await this.getAccessToken(userId, 'linkedin');
+        return this._linkedInUserInfo(accessToken);
+    }
+
+    /**
+     * Share a post on LinkedIn using the UGC Posts API (Share on LinkedIn product)
+     * Supports: text-only, article link, or image
+     */
+    async postToLinkedIn(userId, { text, link, linkTitle, linkDescription, imageUrl }) {
+        const accessToken = await this.getAccessToken(userId, 'linkedin');
+        const authorUrn   = await this._getLinkedInMemberUrn(userId, accessToken);
+
+        let shareMediaCategory = 'NONE';
+        const media = [];
+
+        if (link) {
+            shareMediaCategory = 'ARTICLE';
+            media.push({
+                status:      'READY',
+                originalUrl: link,
+                ...(linkTitle       ? { title:       { text: linkTitle } }       : {}),
+                ...(linkDescription ? { description: { text: linkDescription } } : {})
+            });
+        } else if (imageUrl) {
+            shareMediaCategory = 'IMAGE';
+            media.push({ status: 'READY', originalUrl: imageUrl });
+        }
+
+        const body = {
+            author:        authorUrn,
+            lifecycleState: 'PUBLISHED',
+            specificContent: {
+                'com.linkedin.ugc.ShareContent': {
+                    shareCommentary:    { text },
+                    shareMediaCategory,
+                    ...(media.length ? { media } : {})
+                }
+            },
+            visibility: {
+                'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+            }
+        };
+
+        try {
+            const response = await axios.post(
+                'https://api.linkedin.com/v2/ugcPosts',
+                body,
+                { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0' } }
+            );
+            const postId = response.headers['x-restli-id'] || response.data.id;
+            console.log(`[SocialMedia] Posted to LinkedIn: ${postId} for ${authorUrn}`);
+            return { success: true, platform: 'linkedin', postId, author: authorUrn };
+        } catch (error) {
+            const msg = error.response?.data?.message || error.message;
+            console.error('[SocialMedia] LinkedIn post failed:', msg);
+            throw new Error(`LinkedIn post failed: ${msg}`);
         }
     }
 

@@ -217,26 +217,38 @@ module.exports = (socialMedia) => {
         }
     });
 
-    // ─── LinkedIn Posting ───
+    // ─── LinkedIn ───
+
+    /**
+     * GET /api/social/linkedin/profile
+     * Return the OIDC userinfo for the authenticated LinkedIn user
+     * (sub, name, given_name, family_name, email, picture)
+     */
+    router.get('/linkedin/profile', async (req, res) => {
+        const userId = req.query.userId || req.headers['x-user-id'];
+        if (!userId) return res.status(400).json({ error: 'User ID required' });
+        try {
+            const profile = await socialMedia.getLinkedInProfile(userId);
+            res.json(profile);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
 
     /**
      * POST /api/social/linkedin/post
-     * Create a LinkedIn post
+     * Share content on LinkedIn (Share on LinkedIn product — ugcPosts API)
+     * Body: { userId, text, link?, linkTitle?, linkDescription?, imageUrl? }
      */
     router.post('/linkedin/post', async (req, res) => {
         const userId = req.body.userId || req.headers['x-user-id'];
-        const { text, imageUrl, link } = req.body;
+        const { text, imageUrl, link, linkTitle, linkDescription } = req.body;
 
-        if (!userId) {
-            return res.status(400).json({ error: 'User ID required' });
-        }
-
-        if (!text) {
-            return res.status(400).json({ error: 'Text required' });
-        }
+        if (!userId) return res.status(400).json({ error: 'User ID required' });
+        if (!text)   return res.status(400).json({ error: 'text required' });
 
         try {
-            const result = await socialMedia.postToLinkedIn(userId, { text, imageUrl, link });
+            const result = await socialMedia.postToLinkedIn(userId, { text, imageUrl, link, linkTitle, linkDescription });
             res.json(result);
         } catch (error) {
             res.status(500).json({ error: error.message });
