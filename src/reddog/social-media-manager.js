@@ -26,17 +26,30 @@ class SocialMediaManager {
         this.platforms = {
             instagram: {
                 name: 'Instagram',
-                authUrl: 'https://api.instagram.com/oauth/authorize',
-                tokenUrl: 'https://api.instagram.com/oauth/access_token',
-                apiUrl: 'https://graph.instagram.com',
-                scopes: ['instagram_basic', 'instagram_content_publish', 'pages_read_engagement']
+                authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
+                tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',
+                apiUrl: 'https://graph.facebook.com/v18.0',
+                scopes: [
+                    'instagram_basic',
+                    'instagram_content_publish',
+                    'instagram_manage_messages',
+                    'instagram_manage_comments',
+                    'pages_read_engagement',
+                    'pages_show_list'
+                ]
             },
             facebook: {
                 name: 'Facebook',
                 authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
                 tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',
                 apiUrl: 'https://graph.facebook.com/v18.0',
-                scopes: ['pages_manage_posts', 'pages_read_engagement', 'ads_management', 'business_management']
+                scopes: [
+                    'pages_manage_posts',
+                    'pages_read_engagement',
+                    'pages_messaging',
+                    'ads_management',
+                    'business_management'
+                ]
             },
             linkedin: {
                 name: 'LinkedIn',
@@ -74,18 +87,22 @@ class SocialMediaManager {
             throw new Error(`Missing ${platform.toUpperCase()}_CLIENT_ID environment variable`);
         }
 
-        // Generate state token for CSRF protection
-        const state = crypto.randomBytes(16).toString('hex');
+        // Generate state token — base64 JSON containing userId and platform for callback extraction
+        const statePayload = Buffer.from(JSON.stringify({
+            userId,
+            platform,
+            nonce: crypto.randomBytes(8).toString('hex')
+        })).toString('base64');
         
         // Store state in database for verification
-        this.storeOAuthState(userId, platform, state);
+        this.storeOAuthState(userId, platform, statePayload);
 
         const params = new URLSearchParams({
             client_id: clientId,
             redirect_uri: redirectUri,
             scope: config.scopes.join(' '),
             response_type: 'code',
-            state: state
+            state: statePayload
         });
 
         return `${config.authUrl}?${params.toString()}`;
@@ -427,6 +444,114 @@ class SocialMediaManager {
         }
     }
 
+    // ─── Meta Helpers ───
+
+    /**
+     * Generate appsecret_proof for server-side Graph API calls.
+     * Required when App Setting 'Require App Secret' is enabled.
+     */
+    getAppSecretProof(accessToken) {
+        const appSecret = process.env.META_APP_SECRET;
+        if (!appSecret) return null;
+        return crypto.createHmac('sha256', appSecret).update(accessToken).digest('hex');
+    }
+
+    /**
+     * Build Graph API query params including optional appsecret_proof
+     */
+    _graphParams(accessToken, extra = {}) {
+        const params = { access_token: accessToken, ...extra };
+        const proof = this.getAppSecretProof(accessToken);
+        if (proof) params.appsecret_proof = proof;
+        return params;
+    }
+
+    // ─── Facebook Messenger ───
+
+    /**
+     * Send a Messenger message to a user via the Send API
+     */
+    async sendMessengerMessage(recipientId, text) {
+        const pageToken = process.env.META_PAGE_ACCESS_TOKEN;
+        if (!pageToken) throw new Error('META_PAGE_ACCESS_TOKEN not configured');
+
+        const config = this.platforms.facebook;
+        const params = this._graphParams(pageToken);
+
+        try {
+            const response = await axios.post(
+                `${config.apiUrl}/me/messages`,
+                {
+                    recipient: { id: recipientId },
+                    message: { text },
+                    messaging_type: 'RESPONSE'
+                },
+                { params }
+            );
+            console.log(`[SocialMedia] Messenger sent to ${recipientId}: ${response.data.message_id}`);
+            return { success: true, messageId: response.data.message_id };
+        } catch (error) {
+            const msg = error.response?.data?.error?.message || error.message;
+            throw new Error(`Messenger send failed: ${msg}`);
+        }
+    }
+
+    // ─── Instagram Messaging ───
+
+    /**
+     * Send an Instagram DM reply
+     */
+    async sendInstagramReply(recipientId, text) {
+        const pageToken = process.env.INSTAGRAM_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN;
+        if (!pageToken) throw new Error('INSTAGRAM_PAGE_ACCESS_TOKEN not configured');
+
+        const instagramAccountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+        if (!instagramAccountId) throw new Error('INSTAGRAM_BUSINESS_ACCOUNT_ID not configured');
+
+        const config = this.platforms.facebook;
+        const params = this._graphParams(pageToken);
+
+        try {
+            const response = await axios.post(
+                `${config.apiUrl}/${instagramAccountId}/messages`,
+                {
+                    recipient: { id: recipientId },
+                    message: { text }
+                },
+                { params }
+            );
+            console.log(`[SocialMedia] Instagram DM sent to ${recipientId}: ${response.data.message_id}`);
+            return { success: true, messageId: response.data.message_id };
+        } catch (error) {
+            const msg = error.response?.data?.error?.message || error.message;
+            throw new Error(`Instagram DM failed: ${msg}`);
+        }
+    }
+
+    /**
+     * Reply to an Instagram comment
+     */
+    async replyToInstagramComment(commentId, text) {
+        const pageToken = process.env.INSTAGRAM_PAGE_ACCESS_TOKEN || process.env.META_PAGE_ACCESS_TOKEN;
+        if (!pageToken) throw new Error('INSTAGRAM_PAGE_ACCESS_TOKEN not configured');
+
+        const config = this.platforms.facebook;
+        const params = this._graphParams(pageToken);
+
+        try {
+            const response = await axios.post(
+                `${config.apiUrl}/${commentId}/replies`,
+                { message: text },
+                { params }
+            );
+            console.log(`[SocialMedia] Instagram comment reply to ${commentId}: ${response.data.id}`);
+            return { success: true, replyId: response.data.id };
+        } catch (error) {
+            const msg = error.response?.data?.error?.message || error.message;
+            throw new Error(`Instagram comment reply failed: ${msg}`);
+        }
+    }
+
     // ─── WhatsApp Business Messaging ───
 
     getWhatsAppToken() {
@@ -557,6 +682,56 @@ class SocialMediaManager {
         } catch (error) {
             const msg = error.response?.data?.error?.message || error.message;
             throw new Error(`WhatsApp template send failed: ${msg}`);
+        }
+    }
+
+    /**
+     * Mark a WhatsApp message as read
+     */
+    async markWhatsAppRead(messageId) {
+        const token = this.getWhatsAppToken();
+        const phoneNumberId = this.getWhatsAppPhoneNumberId();
+        try {
+            await axios.post(
+                `${this.platforms.whatsapp.apiUrl}/${phoneNumberId}/messages`,
+                { messaging_product: 'whatsapp', status: 'read', message_id: messageId },
+                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+            );
+        } catch (_) {} // Non-fatal
+    }
+
+    /**
+     * Send a WhatsApp interactive button message
+     */
+    async sendWhatsAppButtons(to, bodyText, buttons) {
+        const token = this.getWhatsAppToken();
+        const phoneNumberId = this.getWhatsAppPhoneNumberId();
+
+        const buttonList = buttons.slice(0, 3).map((b, i) => ({
+            type: 'reply',
+            reply: { id: b.id || `btn_${i}`, title: b.title.substring(0, 20) }
+        }));
+
+        try {
+            const response = await axios.post(
+                `${this.platforms.whatsapp.apiUrl}/${phoneNumberId}/messages`,
+                {
+                    messaging_product: 'whatsapp',
+                    recipient_type: 'individual',
+                    to: to.replace(/[^0-9]/g, ''),
+                    type: 'interactive',
+                    interactive: {
+                        type: 'button',
+                        body: { text: bodyText },
+                        action: { buttons: buttonList }
+                    }
+                },
+                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+            );
+            return { success: true, messageId: response.data.messages[0]?.id };
+        } catch (error) {
+            const msg = error.response?.data?.error?.message || error.message;
+            throw new Error(`WhatsApp buttons send failed: ${msg}`);
         }
     }
 

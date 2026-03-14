@@ -260,6 +260,14 @@ Student backgrounds: beginner, farmer, student, technical, professional, sprouts
 Available course IDs: dashboard-intro, farmyard-energy, farmyard-soil-climate, ai-agents, silo-management, sustainable-farming, precision-agriculture, off-grid-energy, sprouts, farmg8-marketplace
 
 Always detect the user's likely background from context and suggest the most relevant course.
+
+When sensor data shows conditions that need action, respond with:
+{"action": "ui_trigger", "type": "conditional_control", "condition": "<description>", "suggestion": "<action>", "devices": [{"type": "<type>", "action": "<action>", "label": "<label>"}, ...]}
+
+Conditional control examples:
+- Battery 75-100% AND soil moisture < 60% → suggest irrigation pump
+- Battery < 30% AND high load → suggest load shedding
+- Rain forecast AND soil moisture > 80% → suggest closing valves
 `;
 
         // Inject available sensor providers dynamically from registry
@@ -469,7 +477,18 @@ Always detect the user's likely background from context and suggest the most rel
                 } catch (_) {}
             }
 
-            // Step 2e: Check if AI wants to run a query
+            // Step 2f: Check if AI wants to trigger UI controls
+            const uiTriggerMatch = aiReply.match(/\{[\s\S]*?"action"\s*:\s*"ui_trigger"[\s\S]*?\}/);
+            if (uiTriggerMatch) {
+                try {
+                    const uiTrigger = JSON.parse(uiTriggerMatch[0]);
+                    await this.addToHistory(userId, 'user', userMessage);
+                    await this.addToHistory(userId, 'assistant', aiReply);
+                    return { reply: aiReply, uiTrigger };
+                } catch (_) {}
+            }
+
+            // Step 2g: Check if AI wants to run a query
             const queryMatch = aiReply.match(/\{[\s\S]*?"action"\s*:\s*"query"[\s\S]*?\}/);
             if (queryMatch && this.db && this.db.isConnected) {
                 try {

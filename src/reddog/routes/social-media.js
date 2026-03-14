@@ -25,11 +25,16 @@ module.exports = (socialMedia) => {
         try {
             const redirectUri = process.env.OAUTH_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/social/auth/callback`;
             const authUrl = socialMedia.getAuthUrl(platform, userId, redirectUri);
-            
+
+            // If request is from a browser (Accept: text/html), redirect directly
+            if (req.headers.accept && req.headers.accept.includes('text/html')) {
+                return res.redirect(authUrl);
+            }
+
             res.json({ 
                 authUrl,
                 platform,
-                message: `Please visit this URL to authenticate with ${platform}`
+                message: `Visit this URL to authenticate with ${platform}`
             });
         } catch (error) {
             res.status(400).json({ error: error.message });
@@ -44,10 +49,8 @@ module.exports = (socialMedia) => {
         const { code, state, error, error_description } = req.query;
         
         if (error) {
-            return res.status(400).json({ 
-                error: error,
-                description: error_description 
-            });
+            const dashboardUrl = process.env.DASHBOARD_URL || '/';
+            return res.redirect(`${dashboardUrl}?oauth_error=${encodeURIComponent(error_description || error)}`);
         }
 
         if (!code || !state) {
@@ -55,24 +58,41 @@ module.exports = (socialMedia) => {
         }
 
         try {
-            // Extract platform and userId from state (you may need to adjust this based on your implementation)
-            const userId = req.query.userId || req.headers['x-user-id'];
-            const platform = req.query.platform;
+            // State is base64-encoded JSON: { userId, platform }
+            let userId, platform;
+            try {
+                const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+                userId = decoded.userId;
+                platform = decoded.platform;
+            } catch (_) {
+                // Fallback: state is a raw token, get from query params
+                userId = req.query.userId;
+                platform = req.query.platform;
+            }
 
             if (!userId || !platform) {
-                return res.status(400).json({ error: 'Missing user ID or platform' });
+                return res.status(400).json({ error: 'Could not extract userId/platform from state' });
             }
 
             const redirectUri = process.env.OAUTH_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/social/auth/callback`;
             const tokenData = await socialMedia.exchangeCodeForToken(platform, code, redirectUri, state, userId);
 
+            const dashboardUrl = process.env.DASHBOARD_URL || '/';
+            const successUrl = `${dashboardUrl}?oauth_success=${platform}&expires=${tokenData.expires_in || ''}`;
+
+            // Browser flow → redirect back to dashboard
+            if (req.headers.accept && req.headers.accept.includes('text/html')) {
+                return res.redirect(successUrl);
+            }
+
             res.json({
                 success: true,
                 platform,
-                message: `Successfully authenticated with ${platform}!`,
+                message: `Authenticated with ${platform}!`,
                 expiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null
             });
         } catch (error) {
+            console.error('[Social] OAuth callback error:', error.message);
             res.status(500).json({ error: error.message });
         }
     });
@@ -308,6 +328,46 @@ module.exports = (socialMedia) => {
             accessToken: process.env.WHATSAPP_ACCESS_TOKEN ? '✓ Set' : '✗ Missing',
             businessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ? '✓ Set' : '✗ Missing'
         });
+    });
+
+    // ─── Facebook Messenger ───
+
+    /**
+     * POST /api/social/messenger/send
+     * Send a Messenger message to a user
+     * Body: { recipientId, text }
+     */
+    router.post('/messenger/send', async (req, res) => {
+        const { recipientId, text } = req.body;
+        if (!recipientId || !text) {
+            return res.status(400).json({ error: 'recipientId and text are required' });
+        }
+        try {
+            const result = await socialMedia.sendMessengerMessage(recipientId, text);
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // ─── WhatsApp Interactive ───
+
+    /**
+     * POST /api/social/whatsapp/buttons
+     * Send a WhatsApp interactive button message
+     * Body: { to, bodyText, buttons: [{ id, title }, ...] } (max 3 buttons)
+     */
+    router.post('/whatsapp/buttons', async (req, res) => {
+        const { to, bodyText, buttons } = req.body;
+        if (!to || !bodyText || !Array.isArray(buttons)) {
+            return res.status(400).json({ error: 'to, bodyText, and buttons (array) are required' });
+        }
+        try {
+            const result = await socialMedia.sendWhatsAppButtons(to, bodyText, buttons);
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
     });
 
     return router;

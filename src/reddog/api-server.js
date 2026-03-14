@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const BillingSystem = require('./billing-system');
 const CourseTeacher = require('./course-teacher');
+const SmartChecks = require('./smart-checks');
+const metaWebhooksRoute = require('./routes/meta-webhooks');
+const socialMediaRoute = require('./routes/social-media');
 
 class APIServer {
     constructor(aiEngine, db, blobStorage, serviceBus, approvalManager, socialMedia, deviceCommands = null, sensorCommands = null) {
@@ -15,6 +18,7 @@ class APIServer {
         this.sensorCommands = sensorCommands;
         this.billing = new BillingSystem({ db });
         this.courseTeacher = new CourseTeacher({ apiKey: process.env.OPENROUTER_API_KEY, model: process.env.OPENROUTER_MODEL });
+        this.smartChecks = new SmartChecks(sensorCommands);
         this.app = express();
         this.port = process.env.API_PORT || process.env.GATEWAY_PORT || 3001;
         this.setupMiddleware();
@@ -23,10 +27,25 @@ class APIServer {
 
     setupMiddleware() {
         this.app.use(cors());
+        // Capture raw body for Meta webhook signature verification
+        this.app.use((req, res, next) => {
+            let data = '';
+            req.on('data', chunk => { data += chunk; });
+            req.on('end', () => { req.rawBody = data; });
+            next();
+        });
         this.app.use(express.json());
     }
 
     setupRoutes() {
+        // ── Meta Webhooks (must be before other routes for rawBody) ────────
+        this.app.use('/api/webhooks/meta', metaWebhooksRoute(this.socialMedia, this.aiEngine));
+
+        // ── Social Media Routes ───────────────────────────────────────────────
+        if (this.socialMedia) {
+            this.app.use('/api/social', socialMediaRoute(this.socialMedia));
+        }
+
         // Health check
         this.app.get('/health', (req, res) => {
             res.json({
@@ -214,6 +233,12 @@ class APIServer {
                         category: 'education'
                     },
                     {
+                        id: 'smart-check',
+                        label: '🔍 Smart Check',
+                        message: 'Check battery and soil conditions for automation suggestions',
+                        category: 'automation'
+                    },
+                    {
                         id: 'social',
                         label: '✨ Show off — post some tricks',
                         message: null,
@@ -353,6 +378,293 @@ class APIServer {
                 schema: this.aiEngine.getSchema(),
                 databases: this.db ? this.db.listConnectedDatabases() : []
             });
+        });
+
+        // OpenAPI spec endpoint
+        this.app.get('/api/openapi', (req, res) => {
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            const spec = {
+                openapi: '3.0.0',
+                info: {
+                    title: 'Red Dog API',
+                    description: 'Agentic Ag farm data assistant — chat, sensors, devices, courses, billing, and social media',
+                    version: 'v90',
+                    contact: {
+                        name: 'Agentic Ag',
+                        url: 'https://agentic.ag'
+                    }
+                },
+                servers: [
+                    { url: baseUrl, description: 'Production' }
+                ],
+                paths: {
+                    '/health': {
+                        get: {
+                            summary: 'Health check',
+                            description: 'Check API and database connectivity',
+                            tags: ['System'],
+                            responses: {
+                                200: { description: 'Service healthy' }
+                            }
+                        }
+                    },
+                    '/chat': {
+                        post: {
+                            summary: 'Chat with Red Dog',
+                            description: 'Send a message and get AI response with optional database queries',
+                            tags: ['Chat'],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                message: { type: 'string', description: 'User message' },
+                                                userId: { type: 'string', description: 'User identifier for session persistence' }
+                                            },
+                                            required: ['message']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'AI response', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/chat/prompts': {
+                        get: {
+                            summary: 'Quick-action prompt chips',
+                            description: 'Get structured prompt suggestions for the chat UI',
+                            tags: ['Chat'],
+                            responses: {
+                                200: { description: 'Prompt list', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/courses': {
+                        get: {
+                            summary: 'List all courses',
+                            description: 'Get available courses with optional category filter',
+                            tags: ['Courses'],
+                            parameters: [
+                                { name: 'category', in: 'query', schema: { type: 'string' }, description: 'Filter by category' }
+                            ],
+                            responses: {
+                                200: { description: 'Course list', content: { 'application/json': { schema: { type: 'object' } } } },
+                                404: { description: 'Course not found' }
+                            }
+                        }
+                    },
+                    '/courses/session': {
+                        post: {
+                            summary: 'Start a course session',
+                            description: 'Begin a new learning session for a user',
+                            tags: ['Courses'],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                userId: { type: 'string' },
+                                                courseId: { type: 'string' },
+                                                background: { type: 'string', enum: ['beginner', 'farmer', 'student', 'technical', 'professional', 'sprouts'] }
+                                            },
+                                            required: ['userId', 'courseId']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'Session started', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/courses/question/{userId}': {
+                        get: {
+                            summary: 'Get next question',
+                            description: 'Generate the next adaptive question for a user session',
+                            tags: ['Courses'],
+                            parameters: [
+                                { name: 'userId', in: 'path', required: true, schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Question data', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/courses/answer/{userId}': {
+                        post: {
+                            summary: 'Evaluate answer',
+                            description: 'Submit and evaluate a user answer with feedback',
+                            tags: ['Courses'],
+                            parameters: [
+                                { name: 'userId', in: 'path', required: true, schema: { type: 'string' } }
+                            ],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                answer: { type: 'string' }
+                                            },
+                                            required: ['answer']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'Evaluation result', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/courses/{courseId}/teacher-prompts': {
+                        get: {
+                            summary: 'Get teacher prompts',
+                            description: 'Get discussion prompts for classroom teaching',
+                            tags: ['Courses'],
+                            parameters: [
+                                { name: 'courseId', in: 'path', required: true, schema: { type: 'string' } },
+                                { name: 'background', in: 'query', schema: { type: 'string', enum: ['beginner', 'farmer', 'student', 'technical', 'professional', 'sprouts'] } },
+                                { name: 'count', in: 'query', schema: { type: 'integer', default: 5 } }
+                            ],
+                            responses: {
+                                200: { description: 'Teacher prompts', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/sensors/{farm}/latest': {
+                        get: {
+                            summary: 'Latest sensor readings',
+                            description: 'Get latest readings for a farm (all providers or specific)',
+                            tags: ['Sensors'],
+                            parameters: [
+                                { name: 'farm', in: 'path', required: true, schema: { type: 'string' } },
+                                { name: 'provider', in: 'query', schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Sensor data', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/devices/lorawan': {
+                        get: {
+                            summary: 'List LoRaWAN devices',
+                            description: 'Get all configured LoRaWAN devices',
+                            tags: ['Devices'],
+                            responses: {
+                                200: { description: 'Device list', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/devices/wattwatchers/{deviceId}/switches': {
+                        get: {
+                            summary: 'Get switch status',
+                            description: 'Get current status of WattWatchers switches',
+                            tags: ['Devices'],
+                            parameters: [
+                                { name: 'deviceId', in: 'path', required: true, schema: { type: 'string' } },
+                                { name: 'siteId', in: 'query', schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Switch status', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/schema': {
+                        get: {
+                            summary: 'Database schema',
+                            description: 'Get cached database schema and connected databases',
+                            tags: ['System'],
+                            responses: {
+                                200: { description: 'Schema info', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/query': {
+                        post: {
+                            summary: 'Execute SQL query',
+                            description: 'Run a SELECT query (safety enforced)',
+                            tags: ['Database'],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                sql: { type: 'string' },
+                                                database: { type: 'string' }
+                                            },
+                                            required: ['sql']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'Query results', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/smart-checks': {
+                        get: {
+                            summary: 'Smart automation checks',
+                            description: 'Evaluate battery, soil, and weather conditions for automation suggestions',
+                            tags: ['Automation'],
+                            parameters: [
+                                { name: 'farm', in: 'query', schema: { type: 'string', default: 'Grassgum Farm' }, description: 'Farm name' }
+                            ],
+                            responses: {
+                                200: { description: 'Automation triggers', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    }
+                },
+                tags: [
+                    { name: 'Chat', description: 'Conversational AI interface' },
+                    { name: 'Courses', description: 'Adaptive learning system' },
+                    { name: 'Sensors', description: 'Real-time sensor data' },
+                    { name: 'Devices', description: 'Device control and status' },
+                    { name: 'Database', description: 'SQL queries and schema' },
+                    { name: 'Automation', description: 'Smart automation triggers' },
+                    { name: 'System', description: 'Health and diagnostics' }
+                ]
+            };
+            res.json(spec);
+        });
+
+        // Smart checks endpoint — evaluate conditions and suggest controls
+        this.app.get('/api/smart-checks', async (req, res) => {
+            try {
+                const { farm = 'Grassgum Farm' } = req.query;
+                
+                if (!this.sensorCommands) {
+                    return res.status(503).json({ 
+                        error: 'Sensor commands not available',
+                        triggers: [] 
+                    });
+                }
+
+                const triggers = await this.smartChecks.runAllChecks(farm);
+                
+                res.json({
+                    farm,
+                    timestamp: new Date().toISOString(),
+                    triggers,
+                    count: triggers.length
+                });
+            } catch (error) {
+                console.error('[SmartChecks] Error:', error.message);
+                res.status(500).json({ 
+                    error: error.message,
+                    triggers: [] 
+                });
+            }
         });
 
         // List tables (active database)

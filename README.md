@@ -8,6 +8,7 @@ Deploy your personal AI assistant to Azure Container Apps with Discord integrati
 
 - 🐕 **Red Dog AI Assistant** running on Azure Container Apps
 - 💬 **Discord Integration** - Chat with your AI via Discord DMs
+- 🎓 **Course Teacher** - Adaptive learning system with 10 farm/tech courses
 - 🔐 **Secure by Default** - Gateway token authentication + DM allowlist
 - 📊 **Azure Monitoring** - Full observability via Log Analytics
 
@@ -335,6 +336,78 @@ To access the Control UI:
 ```
 https://<your-app-url>/?token=<your-gateway-token>
 ```
+
+---
+
+## 🎓 Course Teacher System
+
+Red Dog now includes an adaptive learning system that teaches Agentic Ag platform courses using real dashboard documentation.
+
+### Available Courses
+
+| Course | Level | Duration | Price | Topics |
+|--------|-------|----------|-------|--------|
+| Dashboard Intro | Beginner | 30 min | Free | Login, navigation, overview |
+| Farm Energy Monitoring | Intermediate | 45 min | Free | Solar, battery, WattWatchers |
+| Soil, Climate and Water | Intermediate | 40 min | Free | Sensors, irrigation, IoT |
+| Working with AI Agents | Beginner | 30 min | Free | Red Dog, Trevor, Daisy Bell |
+| The Silo Management | Advanced | 60 min | Free | Projects, audits, Tool Shed |
+| Sustainable Farming | Beginner | 6 weeks | $299 | Regenerative practices |
+| Precision Agriculture | Intermediate | 6 weeks | $279 | IoT, LoRaWAN, data analytics |
+| Off-Grid Energy Systems | Advanced | 8.5 hours | $499 | Solar, inverters, Selectronic |
+| Sprouts Program | Beginner | 10 weeks | Free | Kids' farm learning |
+| FarmG8 Marketplace | Beginner | 30 min | Free | Products, agritourism |
+
+### Student Profiles
+
+Red Dog adapts questions to 6 student backgrounds:
+
+- 🐣 **Beginner** — Plain language, multiple choice, analogies
+- 👨‍🌾 **Working Farmer** — Practical outcomes, "what would you do" scenarios
+- 🎒 **School/Uni Student** — Structured theory-to-practice
+- 💻 **Technical/IT** — Data flows, APIs, architecture
+- 💼 **Agribusiness Professional** — ROI, carbon, compliance, market
+- 🌱 **Sprouts (Kids)** — Fun, short, farm facts
+
+### Using the Course Teacher
+
+**In Chat (Natural Language):**
+```
+"Show me available courses"
+"Start the energy monitoring course for a farmer"
+"Next question"
+"Teacher prompts for the precision agriculture course"
+```
+
+**API Endpoints (for Dashboard UI):**
+```
+GET  /api/courses                          # List all courses
+GET  /api/courses/:courseId                # Course details
+POST /api/courses/session                  # Start session {userId, courseId, background}
+GET  /api/courses/question/:userId         # Next question
+POST /api/courses/answer/:userId           # Evaluate answer {answer}
+GET  /api/courses/:courseId/teacher-prompts # Classroom prompts
+GET  /api/openapi                          # Full OpenAPI 3.0 spec for all endpoints
+```
+
+**Quick-Action Chip:**
+The 🎓 "Start a Course" chip appears in `/api/chat/prompts` for easy access.
+
+### Voice & Avatar Ready
+
+Every question includes a `voicePrompt` field (e.g., *"Righto mate, imagine your battery is a bucket of water..."*) ready for TTS or cartoon avatar integration.
+
+### Content Source
+
+All course content is loaded directly from the Agentic Ag dashboard documentation:
+- `DASHBOARD-USER-GUIDE.md`
+- `README-ENERGY-MONITORING.md`
+- `README-VICTRON-INTEGRATION.md`
+- `README-RENOGY-INTEGRATION.md`
+
+No content duplication — always in sync with the latest docs.
+
+---
 
 ## Configuration
 
