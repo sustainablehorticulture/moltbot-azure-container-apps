@@ -299,15 +299,24 @@ class BlobStorageManager {
      * @returns {Array} [{ name, url, sasUrl, contentType, size, lastModified }]
      */
     async getFarmMedia(container = 'farmmedia', prefix = '', maxResults = 20) {
-        if (!this.isConnected) throw new Error('Blob storage not connected');
-
         const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic'];
 
-        const client = await this.getContainerClient(container);
-        if (!client) {
-            console.warn(`[BlobStorage] Container '${container}' not found — no farm media available`);
+        // Use dedicated grassgumfarm storage account if configured; fall back to default
+        const farmConn = process.env.FARM_MEDIA_STORAGE_CONNECTION_STRING;
+        let serviceClient = this.blobServiceClient;
+        if (farmConn) {
+            serviceClient = BlobServiceClient.fromConnectionString(farmConn);
+        } else if (!this.isConnected) {
+            throw new Error('Blob storage not connected');
+        }
+
+        const containerClient = serviceClient.getContainerClient(container);
+        const exists = await containerClient.exists();
+        if (!exists) {
+            console.warn(`[BlobStorage] Container '${container}' not found in farm media storage`);
             return [];
         }
+        const client = containerClient;
 
         const results = [];
         for await (const blob of client.listBlobsFlat({ prefix, includeMetadata: true })) {
