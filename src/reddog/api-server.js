@@ -94,12 +94,6 @@ class APIServer {
             });
         });
 
-        // Social media routes
-        if (this.socialMedia) {
-            const socialMediaRoutes = require('./routes/social-media')(this.socialMedia);
-            this.app.use('/api/social', socialMediaRoutes);
-        }
-
         // Twilio SMS webhook — receives YES/NO replies for device command confirmation
         this.app.post('/api/twilio/sms', express.urlencoded({ extended: false }), async (req, res) => {
             try {
