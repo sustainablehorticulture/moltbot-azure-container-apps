@@ -100,10 +100,17 @@ class SocialMediaManager {
         const params = new URLSearchParams({
             client_id: clientId,
             redirect_uri: redirectUri,
-            scope: config.scopes.join(' '),
             response_type: 'code',
             state: statePayload
         });
+
+        // Facebook Login for Business — config_id replaces scope
+        const fbConfigId = platform === 'facebook' && process.env.FACEBOOK_LOGIN_CONFIG_ID;
+        if (fbConfigId) {
+            params.set('config_id', fbConfigId);
+        } else {
+            params.set('scope', config.scopes.join(' '));
+        }
 
         return `${config.authUrl}?${params.toString()}`;
     }
