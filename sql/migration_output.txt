@@ -1,0 +1,8 @@
+Changed database context to 'zerosumag'.
+Msg 262, Level 14, State 1, Server zerosumag, Line 7
+CREATE TABLE permission denied in database 'zerosumag'.
+Msg 262, Level 14, State 1, Server zerosumag, Line 7
+CREATE TABLE permission denied in database 'zerosumag'.
+Msg 262, Level 14, State 18, Server zerosumag, Procedure sp_ProductCheckIn, Line 4
+CREATE PROCEDURE permission denied in database 'zerosumag'.
+Migration complete.
