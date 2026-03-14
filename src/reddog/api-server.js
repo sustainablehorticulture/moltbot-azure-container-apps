@@ -54,7 +54,7 @@ class APIServer {
         this.app.use((req, res, next) => {
             if (PUBLIC_PREFIXES.some(p => req.path.startsWith(p))) return next();
 
-            const gatewayToken = process.env.GATEWAY_TOKEN || process.env.MOLTBOT_GATEWAY_TOKEN;
+            const gatewayToken = process.env.CLAWDBOT_GATEWAY_TOKEN || process.env.GATEWAY_TOKEN || process.env.MOLTBOT_GATEWAY_TOKEN;
             if (!gatewayToken) return next(); // token not configured — allow all (dev mode)
 
             const authHeader = req.headers['authorization'] || '';
