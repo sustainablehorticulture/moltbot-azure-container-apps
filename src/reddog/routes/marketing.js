@@ -29,7 +29,7 @@ module.exports = (farmContent, aiEngine) => {
                 farmContent.getAvailableProducts(),
                 farmContent.getEcoStay()
             ]);
-            const courses = farmContent.getCourses();
+            const courses = await farmContent.getCourses();
             res.json({
                 farm: 'Grassgum Farm',
                 timestamp: new Date().toISOString(),
@@ -87,12 +87,12 @@ module.exports = (farmContent, aiEngine) => {
 
     // ── GET /api/marketing/courses ────────────────────────────────────────────
 
-    router.get('/courses', (req, res) => {
+    router.get('/courses', async (req, res) => {
         try {
             const { type } = req.query; // online | onsite
-            const courses = type === 'online'  ? farmContent.getOnlineCourses()
-                          : type === 'onsite'  ? farmContent.getOnsiteCourses()
-                          : farmContent.getCourses();
+            const courses = type === 'online'  ? await farmContent.getOnlineCourses()
+                          : type === 'onsite'  ? await farmContent.getOnsiteCourses()
+                          : await farmContent.getCourses();
             res.json({ courses, count: courses.length });
         } catch (err) {
             res.status(500).json({ error: err.message });

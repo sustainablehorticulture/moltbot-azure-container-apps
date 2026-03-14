@@ -298,7 +298,7 @@ async function getSmartReply(text, from, farmContent) {
     // Course inquiry
     if (['course', 'learn', 'training', 'workshop', 'class', 'education', 'study', 'online'].some(k => t.includes(k))) {
         try {
-            const courses = farmContent.getCourses();
+            const courses = await farmContent.getCourses();
             if (!courses.length) return null;
             const lines = courses.slice(0, 5).map(c => `• ${c.title} (${c.level}) — ${c.duration}${c.price ? ` — $${c.price}` : ' — Free'}`).join('\n');
             return `🎓 Grassgum Farm Courses:\n\n${lines}\n\nVisit FarmG8 to enrol or ask me about any course!`;

@@ -135,24 +135,17 @@ class FarmContent {
     async getEcoStay() {
         if (this._isCacheValid(this._ecoStayCacheTs)) return this._ecoStayCache;
 
-        const accommodations = await this._query(`
-            SELECT
-                a.id, a.name, a.type, a.description,
-                a.capacity, a.price_per_night, a.available,
-                a.amenities, a.image_url
-            FROM [dbo].[Accommodations] a
-            WHERE a.available = 1
-            ORDER BY a.type, a.name
-        `);
+        // Accommodation listings live in _knownEcoStay() — no Accommodations table in DB
+        const accommodations = [];
 
-        // Get booked dates for next 30 days
+        // Get booked dates for next 30 days from farmg8.Bookings
         const bookings = await this._query(`
             SELECT
                 b.accommodation_id,
                 b.check_in_date,
                 b.check_out_date,
                 b.status
-            FROM [dbo].[Accommodation_Bookings] b
+            FROM [farmg8].[Bookings] b
             WHERE b.status IN ('confirmed', 'pending', 'checked-in')
               AND b.check_in_date >= CAST(GETDATE() AS DATE)
               AND b.check_in_date <= DATEADD(DAY, 30, CAST(GETDATE() AS DATE))
@@ -209,9 +202,26 @@ class FarmContent {
     // ── Courses ───────────────────────────────────────────────────────────────
 
     /**
-     * Get course catalog from courses.json
+     * Get course catalog — tries farmg8.Courses DB first, falls back to courses.json
      */
-    getCourses() {
+    async getCourses() {
+        const rows = await this._query(`
+            SELECT course_id AS id, title, description, stream AS category, level, duration_weeks
+            FROM [farmg8].[Courses]
+            WHERE is_active = 1
+            ORDER BY stream, title
+        `);
+        if (rows.length > 0) {
+            return rows.map(r => ({
+                id:       r.id,
+                title:    r.title,
+                description: r.description,
+                category: r.category,
+                level:    r.level,
+                duration: r.duration_weeks ? `${r.duration_weeks} weeks` : null
+            }));
+        }
+        // Fallback to courses.json
         try {
             const data = JSON.parse(fs.readFileSync(COURSES_PATH, 'utf8'));
             return data.courses || [];
@@ -220,12 +230,24 @@ class FarmContent {
         }
     }
 
-    getOnlineCourses() {
-        return this.getCourses().filter(c => c.category === 'online');
+    async getOnlineCourses() {
+        return (await this.getCourses()).filter(c => c.category === 'online');
     }
 
-    getOnsiteCourses() {
-        return this.getCourses().filter(c => c.category !== 'online');
+    async getOnsiteCourses() {
+        return (await this.getCourses()).filter(c => c.category !== 'online');
+    }
+
+    /**
+     * Get active FarmG8 marketplace listings
+     */
+    async getMarketListings() {
+        return this._query(`
+            SELECT id, title, category, quantity, unit, pricePerUnit, currency, location, status
+            FROM [dbo].[market_listings]
+            WHERE status = 'active'
+            ORDER BY category, title
+        `);
     }
 
     // ── Marketing Content Builder ──────────────────────────────────────────────
@@ -235,11 +257,11 @@ class FarmContent {
      * Injected into every chat so Red Dog always has current farm data.
      */
     async buildMarketingContext() {
-        const [products, ecoStay] = await Promise.all([
+        const [products, ecoStay, courses] = await Promise.all([
             this.getAvailableProducts().catch(() => KNOWN_PRODUCTS),
-            this.getEcoStay().catch(() => this._knownEcoStay())
+            this.getEcoStay().catch(() => this._knownEcoStay()),
+            this.getCourses().catch(() => [])
         ]);
-        const courses  = this.getCourses();
 
         const productLines = products
             .map(p => `  • ${p.name} (${p.category}) — $${p.price}/${p.unit}${p.stock ? ` | Stock: ${p.stock} ${p.unit}` : ''}`)
@@ -277,11 +299,11 @@ Signature products: Grassgum Agave Spirit ($85/bottle), Sides of Beef/Lamb, fres
      * Returns structured content for the AI to use.
      */
     async getContentBrief(platform, topic = null) {
-        const [products, ecoStay] = await Promise.all([
+        const [products, ecoStay, courses] = await Promise.all([
             this.getAvailableProducts().catch(() => KNOWN_PRODUCTS),
-            this.getEcoStay().catch(() => this._knownEcoStay())
+            this.getEcoStay().catch(() => this._knownEcoStay()),
+            this.getCourses().catch(() => [])
         ]);
-        const courses = this.getCourses();
 
         const featured = topic
             ? await this.findProduct(topic)
