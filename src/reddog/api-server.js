@@ -6,6 +6,7 @@ const SmartChecks = require('./smart-checks');
 const metaWebhooksRoute = require('./routes/meta-webhooks');
 const socialMediaRoute = require('./routes/social-media');
 const marketingRoute = require('./routes/marketing');
+const dataDeletionRoute = require('./routes/data-deletion');
 const FarmContent = require('./farm-content');
 
 class APIServer {
@@ -49,6 +50,7 @@ class APIServer {
             '/health',
             '/api/webhooks/',
             '/api/social/auth/',
+            '/api/data-deletion',
             '/api/openapi'
         ];
         this.app.use((req, res, next) => {
@@ -70,6 +72,9 @@ class APIServer {
     setupRoutes() {
         // ── Meta Webhooks (must be before other routes for rawBody) ────────
         this.app.use('/api/webhooks/meta', metaWebhooksRoute(this.socialMedia, this.aiEngine, this.farmContent));
+
+        // ── Meta Data Deletion Callback (public — Meta POSTs without Bearer) ─
+        this.app.use('/api/data-deletion', dataDeletionRoute(this.db));
 
         // ── Social Media Routes ───────────────────────────────────────────────
         if (this.socialMedia) {
