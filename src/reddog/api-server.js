@@ -81,8 +81,8 @@ class APIServer {
             this.app.use('/api/social', socialMediaRoute(this.socialMedia));
         }
 
-        // ── Marketing Routes ─────────────────────────────────────────────────
-        this.app.use('/api/marketing', marketingRoute(this.farmContent, this.aiEngine));
+        // ── Marketing Routes ─────────────────────────────────────────────
+        this.app.use('/api/marketing', marketingRoute(this.farmContent, this.aiEngine, this.sensorCommands, this.blobStorage));
 
         // Health check
         this.app.get('/health', (req, res) => {

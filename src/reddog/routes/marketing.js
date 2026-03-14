@@ -19,7 +19,7 @@ const express = require('express');
 const axios   = require('axios');
 const router  = express.Router();
 
-module.exports = (farmContent, aiEngine) => {
+module.exports = (farmContent, aiEngine, sensorCommands = null, blobStorage = null) => {
 
     // ── GET /api/marketing/context ────────────────────────────────────────────
 
@@ -226,6 +226,164 @@ Generate ONE great ${platform} post now. Do not include any prefix like "Here's 
                 broadcastBody: { recipients, text: message }
             });
         } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    // ── GET /api/marketing/images ─────────────────────────────────────────────
+    // List farm media images (drone, cam, field photos) with 24h SAS URLs
+    // Query: ?container=farm-media&prefix=drone/&max=20
+
+    router.get('/images', async (req, res) => {
+        if (!blobStorage || !blobStorage.isConnected) {
+            return res.status(503).json({ error: 'Blob storage not available' });
+        }
+        try {
+            const { container = 'farm-media', prefix = '', max = 20 } = req.query;
+            const images = await blobStorage.getFarmMedia(container, prefix, parseInt(max));
+            res.json({ images, count: images.length, container, prefix });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    // ── POST /api/marketing/snapshot-post ────────────────────────────────────
+    // Combine live sensor readings + farm data + optional image into an AI post
+    // Optionally publish to a platform immediately
+    //
+    // Body: {
+    //   platform,          // instagram | facebook | linkedin | whatsapp
+    //   imageUrl?,         // direct public URL to use as image
+    //   imageBlobName?,    // pick an image from blob storage by name
+    //   imageContainer?,   // blob container (default: farm-media)
+    //   farmName?,         // filter sensor data by farm (default: all)
+    //   topic?,            // optional content focus
+    //   publish?,          // true = post immediately (requires userId)
+    //   userId?            // required if publish=true
+    // }
+
+    router.post('/snapshot-post', async (req, res) => {
+        try {
+            const {
+                platform = 'instagram',
+                imageUrl,
+                imageBlobName,
+                imageContainer = 'farm-media',
+                farmName,
+                topic,
+                publish = false,
+                userId
+            } = req.body;
+
+            // ── 1. Pull live sensor readings ──────────────────────────────────
+            let sensorSummary = null;
+            if (sensorCommands && sensorCommands.sensor && sensorCommands.sensor.enabled) {
+                try {
+                    const readings = farmName
+                        ? await sensorCommands.sensor.getAllProvidersLatest(farmName)
+                        : await sensorCommands.sensor.getAllFarmsReadings();
+
+                    const flat = Array.isArray(readings) ? readings : Object.values(readings).flat();
+                    const recent = flat.filter(r => r && r.value !== undefined).slice(0, 12);
+
+                    sensorSummary = recent.map(r =>
+                        `${r.metric || r.signal || 'reading'}: ${r.value}${r.unit || ''}`
+                    ).join(', ');
+                } catch (e) {
+                    console.warn('[Marketing] Sensor readings unavailable:', e.message);
+                }
+            }
+
+            // ── 2. Resolve image URL ──────────────────────────────────────────
+            let resolvedImageUrl = imageUrl || null;
+
+            if (!resolvedImageUrl && imageBlobName && blobStorage && blobStorage.isConnected) {
+                try {
+                    const client = await blobStorage.getContainerClient(imageContainer);
+                    if (client) {
+                        const blobClient = client.getBlockBlobClient(imageBlobName);
+                        const { BlobSASPermissions } = require('@azure/storage-blob');
+                        resolvedImageUrl = await blobClient.generateSasUrl({
+                            permissions: BlobSASPermissions.parse('r'),
+                            startsOn:    new Date(),
+                            expiresOn:   new Date(Date.now() + 24 * 60 * 60 * 1000)
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[Marketing] Could not generate image SAS URL:', e.message);
+                }
+            }
+
+            // ── 3. Pull farm content for context ──────────────────────────────
+            const [products, ecoStay, courses] = await Promise.all([
+                farmContent.getAvailableProducts(),
+                farmContent.getEcoStay(),
+                farmContent.getCourses()
+            ]);
+
+            // ── 4. Build AI prompt ────────────────────────────────────────────
+            const platformGuide = {
+                instagram: 'Write an engaging Instagram caption (max 2200 chars). Use emojis, hashtags (#Grassgum #FarmFresh #RegenAg #AgaveSpirit #OffGrid), and a call to action.',
+                facebook:  'Write a friendly Facebook post with storytelling. Include relevant pricing or availability. Max 3 paragraphs.',
+                linkedin:  'Write a professional LinkedIn post about sustainable farming or regenerative agriculture. B2B/industry tone.',
+                whatsapp:  'Write a short WhatsApp broadcast (max 3 sentences). Friendly and direct. Include a price or action if relevant.'
+            }[platform] || 'Write a marketing post.';
+
+            const sensorBlock = sensorSummary
+                ? `\nLive farm sensor readings: ${sensorSummary}`
+                : '';
+            const imageBlock = resolvedImageUrl
+                ? `\nAn image from the farm has been attached to this post.`
+                : '';
+            const focusBlock = topic ? `\nFocus on: ${topic}` : '';
+
+            const prompt = `You are Red Dog, the AI marketing agent for Grassgum Farm.
+
+${platformGuide}
+${focusBlock}${sensorBlock}${imageBlock}
+
+Farm context:
+- Products available: ${products.slice(0, 6).map(p => `${p.name} $${p.price}/${p.unit}`).join(', ')}
+- Eco-Stay: ${ecoStay.slice(0, 3).map(e => `${e.name} $${e.pricePerNight}/night`).join(', ')}
+- Upcoming course: ${courses[0]?.title || 'Sustainable Farming Workshop'} — ${courses[0]?.level || 'All levels'}
+
+Generate ONE compelling ${platform} post now. Do not prefix with "Here's your post:".`;
+
+            if (!aiEngine?.apiKey) return res.status(503).json({ error: 'AI engine not configured' });
+
+            const aiResp = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+                model: aiEngine.model,
+                messages: [{ role: 'user', content: prompt }]
+            }, { headers: { Authorization: `Bearer ${aiEngine.apiKey}`, 'Content-Type': 'application/json' } });
+
+            const content = aiResp.data.choices[0].message.content;
+
+            const result = {
+                platform,
+                content,
+                imageUrl:    resolvedImageUrl,
+                sensorData:  sensorSummary,
+                topic:       topic || null,
+                charCount:   content.length,
+                timestamp:   new Date().toISOString()
+            };
+
+            // ── 5. Optionally publish immediately ─────────────────────────────
+            if (publish && userId) {
+                // socialMedia is not injected into marketing route — return payload for caller to post
+                result.readyToPublish = true;
+                result.note = `Use POST /api/social/${platform}/post with this content to publish`;
+                result.publishBody = platform === 'instagram'
+                    ? { userId, caption: content, imageUrl: resolvedImageUrl }
+                    : platform === 'linkedin'
+                    ? { userId, text: content, imageUrl: resolvedImageUrl }
+                    : { userId, message: content, imageUrl: resolvedImageUrl };
+            }
+
+            res.json(result);
+
+        } catch (err) {
+            console.error('[Marketing] Snapshot post error:', err.message);
             res.status(500).json({ error: err.message });
         }
     });

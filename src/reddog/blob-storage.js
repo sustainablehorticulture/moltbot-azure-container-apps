@@ -11,7 +11,7 @@
  * - Track blob metadata in SQL database
  */
 
-const { BlobServiceClient } = require('@azure/storage-blob');
+const { BlobServiceClient, generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } = require('@azure/storage-blob');
 const crypto = require('crypto');
 
 class BlobStorageManager {
@@ -287,6 +287,59 @@ class BlobStorageManager {
             console.error(`[BlobStorage] Failed to track blob in database: ${err.message}`);
             // Don't throw - blob is still stored, just not tracked in DB
         }
+    }
+
+    /**
+     * List farm media images (drone, cam, field photos) from a storage container
+     * and generate 24-hour SAS URLs that social platforms can load publicly.
+     *
+     * @param {string} container  - Container name (default: 'farm-media')
+     * @param {string} prefix     - Optional blob prefix filter (e.g. 'drone/', 'cam/')
+     * @param {number} maxResults - Max images to return (default 20)
+     * @returns {Array} [{ name, url, sasUrl, contentType, size, lastModified }]
+     */
+    async getFarmMedia(container = 'farm-media', prefix = '', maxResults = 20) {
+        if (!this.isConnected) throw new Error('Blob storage not connected');
+
+        const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic'];
+
+        const client = await this.getContainerClient(container);
+        if (!client) {
+            console.warn(`[BlobStorage] Container '${container}' not found — no farm media available`);
+            return [];
+        }
+
+        const results = [];
+        for await (const blob of client.listBlobsFlat({ prefix, includeMetadata: true })) {
+            if (results.length >= maxResults) break;
+            const ext = blob.name.slice(blob.name.lastIndexOf('.')).toLowerCase();
+            if (!IMAGE_EXTS.includes(ext)) continue;
+
+            const blobClient = client.getBlockBlobClient(blob.name);
+            let sasUrl = null;
+
+            try {
+                sasUrl = await blobClient.generateSasUrl({
+                    permissions:  BlobSASPermissions.parse('r'),
+                    startsOn:     new Date(),
+                    expiresOn:    new Date(Date.now() + 24 * 60 * 60 * 1000)
+                });
+            } catch {
+                sasUrl = blobClient.url;
+            }
+
+            results.push({
+                name:         blob.name,
+                url:          blobClient.url,
+                sasUrl,
+                contentType:  blob.properties.contentType || `image/${ext.slice(1)}`,
+                size:         blob.properties.contentLength,
+                lastModified: blob.properties.lastModified,
+                metadata:     blob.metadata || {}
+            });
+        }
+
+        return results;
     }
 
     /**
