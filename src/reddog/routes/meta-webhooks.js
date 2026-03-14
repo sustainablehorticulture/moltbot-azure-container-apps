@@ -87,7 +87,7 @@ module.exports = (socialMedia, aiEngine, farmContent = null) => {
             } else if (body.object === 'instagram') {
                 await handleInstagramEvents(body.entry, socialMedia, aiEngine);
             } else if (body.object === 'whatsapp_business_account') {
-                await handleWhatsAppEvents(body.entry, socialMedia, aiEngine);
+                await handleWhatsAppEvents(body.entry, socialMedia, aiEngine, farmContent);
             } else {
                 console.log(`[MetaWebhook] Unhandled object type: ${body.object}`);
             }
@@ -197,7 +197,7 @@ async function handleInstagramEvents(entries, socialMedia, aiEngine) {
     }
 }
 
-async function handleWhatsAppEvents(entries, socialMedia, aiEngine) {
+async function handleWhatsAppEvents(entries, socialMedia, aiEngine, farmContent) {
     for (const entry of entries) {
         for (const change of (entry.changes || [])) {
             if (change.field !== 'messages') continue;
