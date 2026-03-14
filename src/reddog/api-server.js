@@ -38,6 +38,33 @@ class APIServer {
             next();
         });
         this.app.use(express.json());
+
+        // ── Bearer token auth ─────────────────────────────────────────────────
+        // Public routes that skip auth:
+        //   /health          — uptime probes
+        //   /api/webhooks/*  — Meta sends events without our token (verified by HMAC instead)
+        //   /api/social/auth/* — OAuth redirect callbacks
+        //   /api/openapi     — spec is public
+        const PUBLIC_PREFIXES = [
+            '/health',
+            '/api/webhooks/',
+            '/api/social/auth/',
+            '/api/openapi'
+        ];
+        this.app.use((req, res, next) => {
+            if (PUBLIC_PREFIXES.some(p => req.path.startsWith(p))) return next();
+
+            const gatewayToken = process.env.GATEWAY_TOKEN || process.env.MOLTBOT_GATEWAY_TOKEN;
+            if (!gatewayToken) return next(); // token not configured — allow all (dev mode)
+
+            const authHeader = req.headers['authorization'] || '';
+            const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+            if (!token || token !== gatewayToken) {
+                return res.status(401).json({ error: 'Unauthorized', message: 'Valid Bearer token required' });
+            }
+            next();
+        });
     }
 
     setupRoutes() {
