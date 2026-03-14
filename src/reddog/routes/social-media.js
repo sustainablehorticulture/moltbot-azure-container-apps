@@ -30,6 +30,59 @@ module.exports = (socialMedia) => {
     // ─── OAuth Authentication ───
 
     /**
+     * GET /api/social/auth/callback
+     * OAuth callback endpoint — MUST be registered before /auth/:platform
+     * to prevent Express matching 'callback' as a platform name
+     */
+    router.get('/auth/callback', async (req, res) => {
+        const { code, state, error, error_description } = req.query;
+
+        if (error) {
+            const dashboardUrl = process.env.DASHBOARD_URL || '/';
+            return res.redirect(`${dashboardUrl}?oauth_error=${encodeURIComponent(error_description || error)}`);
+        }
+
+        if (!code || !state) {
+            return res.status(400).json({ error: 'Missing authorization code or state' });
+        }
+
+        try {
+            let userId, platform;
+            try {
+                const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+                userId = decoded.userId;
+                platform = decoded.platform;
+            } catch (_) {
+                userId = req.query.userId;
+                platform = req.query.platform;
+            }
+
+            if (!userId || !platform) {
+                return res.status(400).json({ error: 'Could not extract userId/platform from state' });
+            }
+
+            const redirectUri = process.env.OAUTH_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/social/auth/callback`;
+            const tokenData = await socialMedia.exchangeCodeForToken(platform, code, redirectUri, state, userId);
+
+            const dashboardUrl = process.env.DASHBOARD_URL || '/';
+            const successUrl = `${dashboardUrl}?oauth_success=${platform}&expires=${tokenData.expires_in || ''}`;
+
+            if (req.headers.accept && req.headers.accept.includes('text/html')) {
+                return res.redirect(successUrl);
+            }
+
+            res.json({ success: true, platform, userId, message: `Successfully authenticated with ${platform}` });
+        } catch (error) {
+            console.error('[OAuth] Callback error:', error.message);
+            const dashboardUrl = process.env.DASHBOARD_URL || '/';
+            if (req.headers.accept && req.headers.accept.includes('text/html')) {
+                return res.redirect(`${dashboardUrl}?oauth_error=${encodeURIComponent(error.message)}`);
+            }
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    /**
      * GET /api/social/auth/:platform
      * Initiate OAuth flow for a platform
      */
@@ -57,62 +110,6 @@ module.exports = (socialMedia) => {
             });
         } catch (error) {
             res.status(400).json({ error: error.message });
-        }
-    });
-
-    /**
-     * GET /api/social/auth/callback
-     * OAuth callback endpoint
-     */
-    router.get('/auth/callback', async (req, res) => {
-        const { code, state, error, error_description } = req.query;
-        
-        if (error) {
-            const dashboardUrl = process.env.DASHBOARD_URL || '/';
-            return res.redirect(`${dashboardUrl}?oauth_error=${encodeURIComponent(error_description || error)}`);
-        }
-
-        if (!code || !state) {
-            return res.status(400).json({ error: 'Missing authorization code or state' });
-        }
-
-        try {
-            // State is base64-encoded JSON: { userId, platform }
-            let userId, platform;
-            try {
-                const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
-                userId = decoded.userId;
-                platform = decoded.platform;
-            } catch (_) {
-                // Fallback: state is a raw token, get from query params
-                userId = req.query.userId;
-                platform = req.query.platform;
-            }
-
-            if (!userId || !platform) {
-                return res.status(400).json({ error: 'Could not extract userId/platform from state' });
-            }
-
-            const redirectUri = process.env.OAUTH_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/social/auth/callback`;
-            const tokenData = await socialMedia.exchangeCodeForToken(platform, code, redirectUri, state, userId);
-
-            const dashboardUrl = process.env.DASHBOARD_URL || '/';
-            const successUrl = `${dashboardUrl}?oauth_success=${platform}&expires=${tokenData.expires_in || ''}`;
-
-            // Browser flow → redirect back to dashboard
-            if (req.headers.accept && req.headers.accept.includes('text/html')) {
-                return res.redirect(successUrl);
-            }
-
-            res.json({
-                success: true,
-                platform,
-                message: `Authenticated with ${platform}!`,
-                expiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null
-            });
-        } catch (error) {
-            console.error('[Social] OAuth callback error:', error.message);
-            res.status(500).json({ error: error.message });
         }
     });
 
