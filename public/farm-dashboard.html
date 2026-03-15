@@ -74,6 +74,21 @@
             <h2 class="text-xl font-semibold mb-4">📍 Farm Location</h2>
             <div id="map"></div>
         </section>
+
+        <!-- Chat Bubble -->
+        <div id="chat-bubble" class="fixed bottom-4 right-4 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 flex flex-col" style="height: 480px;">
+            <div class="bg-green-600 text-white px-4 py-3 rounded-t-lg flex justify-between items-center">
+                <span class="font-semibold">💬 Red Dog Farm Chat</span>
+                <button onclick="toggleChat()" class="text-white hover:text-gray-200">✕</button>
+            </div>
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2 text-sm" style="min-height: 320px; max-height: 320px;">
+                <div class="text-gray-500 italic">Type commands like:<br/>• ndvi -29.80937 152.59111<br/>• launch-burro BURRO-001 -29.80937 152.59111</div>
+            </div>
+            <div class="border-t p-3 flex gap-2">
+                <input type="text" id="chat-input" placeholder="Type a command..." class="flex-1 px-3 py-2 border rounded text-sm" onkeypress="if(event.key==='Enter') sendChatCommand()" />
+                <button onclick="sendChatCommand()" class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">Send</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -173,6 +188,69 @@
 
         // Auto-fetch NDVI on load
         fetchNdvi();
+
+        // Chat bubble functions
+        function toggleChat() {
+            const bubble = document.getElementById('chat-bubble');
+            bubble.style.display = bubble.style.display === 'none' ? 'flex' : 'none';
+        }
+
+        function addChatMessage(sender, text, isError = false) {
+            const messages = document.getElementById('chat-messages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `p-2 rounded ${sender === 'user' ? 'bg-blue-100 ml-auto max-w-[70%]' : isError ? 'bg-red-100 text-red-800' : 'bg-gray-100 max-w-[70%]'}`;
+            msgDiv.innerHTML = `<strong>${sender === 'user' ? 'You' : 'Red Dog'}:</strong> ${text}`;
+            messages.appendChild(msgDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        async function sendChatCommand() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            addChatMessage('user', text);
+            input.value = '';
+            const parts = text.toLowerCase().split(/\s+/);
+            const cmd = parts[0];
+            try {
+                if (cmd === 'ndvi') {
+                    if (parts.length < 3) throw new Error('Usage: ndvi <lat> <lng> [buffer]');
+                    const lat = parseFloat(parts[1]);
+                    const lng = parseFloat(parts[2]);
+                    const buffer = parts[3] ? parseFloat(parts[3]) : 0.5;
+                    if (isNaN(lat) || isNaN(lng)) throw new Error('Invalid lat/lng');
+                    addChatMessage('bot', `Fetching NDVI for (${lat}, ${lng})...`);
+                    const res = await fetch(`${API_BASE}/api/farm/ndvi/latest?lat=${lat}&lng=${lng}&bufferKm=${buffer}`);
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error);
+                    const msg = `🌱 NDVI fetched!\n📅 ${new Date(data.datetime).toLocaleDateString()}\n☁️ Cloud: ${(data.cloudCover*100).toFixed(1)}%\n🔗 ${data.ndviUrl}`;
+                    addChatMessage('bot', msg);
+                } else if (cmd === 'launch-burro') {
+                    if (parts.length < 4) throw new Error('Usage: launch-burro <robot> <lat> <lng> [mission]');
+                    const robot = parts[1];
+                    const lat = parseFloat(parts[2]);
+                    const lng = parseFloat(parts[3]);
+                    const mission = parts[4] || 'ndvi-guided-patrol';
+                    if (isNaN(lat) || isNaN(lng)) throw new Error('Invalid lat/lng');
+                    addChatMessage('bot', `Launching ${robot} at (${lat}, ${lng})...`);
+                    const payload = { robotSerialNumber: robot, lat, lng, missionName: mission };
+                    if (latestNdvi) payload.ndviContext = { tileId: latestNdvi.tileId, datetime: latestNdvi.datetime, ndviUrl: latestNdvi.ndviUrl };
+                    const res = await fetch(`${API_BASE}/api/farm/burro/launch`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error);
+                    const msg = `🤖 Burro launched!\n🔧 ${data.robotSerialNumber}\n🎯 ${data.missionName}\n🆔 ${data.missionId}\n📍 ${data.launchPoint.lat}, ${data.launchPoint.lng}\n🌱 NDVI: ${data.ndviContext ? 'Attached' : 'None'}`;
+                    addChatMessage('bot', msg);
+                } else {
+                    addChatMessage('bot', `Unknown command: ${cmd}. Try: ndvi <lat> <lng> or launch-burro <robot> <lat> <lng>`, true);
+                }
+            } catch (err) {
+                addChatMessage('bot', err.message, true);
+            }
+        }
     </script>
 </body>
 </html>
