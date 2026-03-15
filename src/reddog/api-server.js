@@ -7,6 +7,7 @@ const metaWebhooksRoute = require('./routes/meta-webhooks');
 const socialMediaRoute = require('./routes/social-media');
 const marketingRoute = require('./routes/marketing');
 const dataDeletionRoute = require('./routes/data-deletion');
+const createCryptoRoutes = require('./routes/crypto-payments');
 const FarmContent = require('./farm-content');
 
 class APIServer {
@@ -51,6 +52,7 @@ class APIServer {
             '/api/webhooks/',
             '/api/social/auth/',
             '/api/data-deletion',
+            '/api/payments/crypto/webhook', // Binance Pay webhook
             '/api/openapi'
         ];
         this.app.use((req, res, next) => {
@@ -84,13 +86,24 @@ class APIServer {
         // ── Marketing Routes ─────────────────────────────────────────────
         this.app.use('/api/marketing', marketingRoute(this.farmContent, this.aiEngine, this.sensorCommands, this.blobStorage));
 
+        // ── Farm Routes (NDVI + Burro) ─────────────────────────────────────
+        const farmRoute = require('./routes/farm');
+        this.app.use('/api/farm', farmRoute());
+
+        // ── Crypto Payment Routes ───────────────────────────────────────
+        this.app.use('/api/payments/crypto', createCryptoRoutes(this.db, this.serviceBus));
+
         // Health check
         this.app.get('/health', (req, res) => {
+            const BinancePay = require('./binance-pay');
+            const binancePay = new BinancePay({ db: this.db, serviceBus: this.serviceBus });
+            
             res.json({
                 status: 'ok',
                 database: this.db ? this.db.isConnected : false,
                 databases: this.db ? Object.keys(this.db.pools) : [],
-                billing: this.billing.getStatus()
+                billing: this.billing.getStatus(),
+                binancePay: binancePay.getStatus()
             });
         });
 
