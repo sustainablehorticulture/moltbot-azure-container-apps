@@ -102,11 +102,11 @@ class BinancePay {
             
             // Store payment record
             await this.db.execute(`
-                INSERT INTO crypto_payments (
-                    order_id, binance_order_id, amount, currency, 
-                    status, payment_url, qr_code, customer_email,
-                    created_at, expires_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO reddog.CryptoPayments (
+                    OrderReference, BinanceOrderId, Amount, Currency, 
+                    Status, PaymentUrl, QrCode, CustomerEmail,
+                    UserOid, CreatedAt, ExpiresAt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 orderId,
                 payment.merchantTradeNo,
@@ -116,6 +116,7 @@ class BinancePay {
                 payment.checkoutUrl,
                 payment.qrCode,
                 customerEmail,
+                customerEmail, // Use email as UserOid for now - can be updated to actual UserOid
                 new Date(),
                 new Date(payment.expireTime)
             ]);
@@ -154,10 +155,10 @@ class BinancePay {
 
             // Update local record
             await this.db.execute(`
-                UPDATE crypto_payments 
-                SET status = ?, updated_at = ?, 
-                    transaction_id = ?, paid_amount = ?
-                WHERE binance_order_id = ?
+                UPDATE reddog.CryptoPayments 
+                SET Status = ?, UpdatedAt = ?, 
+                    TransactionId = ?, PaidAmount = ?
+                WHERE BinanceOrderId = ?
             `, [
                 status,
                 new Date(),
@@ -211,38 +212,38 @@ class BinancePay {
 
         // Update payment record
         await this.db.execute(`
-            UPDATE crypto_payments 
-            SET status = 'confirmed', transaction_id = ?, 
-                paid_amount = ?, paid_at = ?, updated_at = ?
-            WHERE binance_order_id = ?
+            UPDATE reddog.CryptoPayments 
+            SET Status = 'confirmed', TransactionId = ?, 
+                PaidAmount = ?, PaidAt = ?, UpdatedAt = ?
+            WHERE BinanceOrderId = ?
         `, [transactionId, orderAmount, new Date(payTime), new Date(), merchantTradeNo]);
 
         // Get payment details
         const payment = await this.db.execute(`
-            SELECT * FROM crypto_payments 
-            WHERE binance_order_id = ?
+            SELECT * FROM reddog.CryptoPayments 
+            WHERE BinanceOrderId = ?
         `, [merchantTradeNo]);
 
         if (payment.length === 0) return;
 
         const paymentRecord = payment[0];
 
-        // Update original order status
+        // Update billing account with crypto payment reference
         await this.db.execute(`
-            UPDATE orders 
-            SET status = 'paid', payment_method = 'crypto', 
-                paid_at = ?, updated_at = ?
-            WHERE id = ?
-        `, [new Date(payTime), new Date(), paymentRecord.order_id]);
+            UPDATE reddog.BillingAccounts 
+            SET CryptoPaymentId = ?, UpdatedAt = GETDATE()
+            WHERE UserOid = ?
+        `, [paymentRecord.Id, paymentRecord.UserOid]);
 
         // Send notification to Trevor
         await this.notifyTrevor({
             type: 'crypto_payment_received',
-            orderId: paymentRecord.order_id,
+            orderId: paymentRecord.OrderReference,
             amount: orderAmount,
             currency: currency,
             transactionId: transactionId,
-            customerEmail: paymentRecord.customer_email,
+            customerEmail: paymentRecord.CustomerEmail,
+            userOid: paymentRecord.UserOid,
             paidAt: payTime
         });
 
@@ -253,10 +254,10 @@ class BinancePay {
         const { merchantTradeNo } = paymentData;
 
         await this.db.execute(`
-            UPDATE crypto_payments 
-            SET status = 'failed', updated_at = ?
-            WHERE binance_order_id = ?
-        `, [new Date(), merchantTradeNo]);
+            UPDATE reddog.CryptoPayments 
+            SET Status = 'failed', UpdatedAt = GETDATE()
+            WHERE BinanceOrderId = ?
+        `, [merchantTradeNo]);
 
         console.log(`[BinancePay] Payment failed: ${merchantTradeNo}`);
     }
@@ -265,10 +266,10 @@ class BinancePay {
         const { merchantTradeNo } = paymentData;
 
         await this.db.execute(`
-            UPDATE crypto_payments 
-            SET status = 'expired', updated_at = ?
-            WHERE binance_order_id = ?
-        `, [new Date(), merchantTradeNo]);
+            UPDATE reddog.CryptoPayments 
+            SET Status = 'expired', UpdatedAt = GETDATE()
+            WHERE BinanceOrderId = ?
+        `, [merchantTradeNo]);
 
         console.log(`[BinancePay] Payment expired: ${merchantTradeNo}`);
     }
@@ -297,37 +298,37 @@ class BinancePay {
 
     async getPaymentHistory(filters = {}) {
         let query = `
-            SELECT cp.*, o.customer_name, o.product_name 
-            FROM crypto_payments cp
-            LEFT JOIN orders o ON cp.order_id = o.id
+            SELECT cp.*, ba.UserEmail, ba.UserName 
+            FROM reddog.CryptoPayments cp
+            LEFT JOIN reddog.BillingAccounts ba ON cp.UserOid = ba.UserOid
             WHERE 1=1
         `;
         const params = [];
 
         if (filters.status) {
-            query += ' AND cp.status = ?';
+            query += ' AND cp.Status = ?';
             params.push(filters.status);
         }
 
         if (filters.currency) {
-            query += ' AND cp.currency = ?';
+            query += ' AND cp.Currency = ?';
             params.push(filters.currency);
         }
 
         if (filters.fromDate) {
-            query += ' AND cp.created_at >= ?';
+            query += ' AND cp.CreatedAt >= ?';
             params.push(filters.fromDate);
         }
 
         if (filters.toDate) {
-            query += ' AND cp.created_at <= ?';
+            query += ' AND cp.CreatedAt <= ?';
             params.push(filters.toDate);
         }
 
-        query += ' ORDER BY cp.created_at DESC';
+        query += ' ORDER BY cp.CreatedAt DESC';
 
         if (filters.limit) {
-            query += ' LIMIT ?';
+            query += ' FETCH FIRST ? ROWS ONLY';
             params.push(filters.limit);
         }
 
@@ -337,20 +338,25 @@ class BinancePay {
     // ─── Revenue Summary ───
 
     async getRevenueSummary(period = '30d') {
-        const dateFilter = period === '24h' ? 'DATE(cp.created_at) = CURDATE()' :
-                         period === '7d' ? 'cp.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)' :
-                         'cp.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+        let dateFilter;
+        if (period === '24h') {
+            dateFilter = 'CAST(cp.PaidAt AS DATE) = CAST(GETDATE() AS DATE)';
+        } else if (period === '7d') {
+            dateFilter = 'cp.PaidAt >= DATEADD(day, -7, GETDATE())';
+        } else {
+            dateFilter = 'cp.PaidAt >= DATEADD(day, -30, GETDATE())';
+        }
 
         const query = `
             SELECT 
-                currency,
+                cp.Currency,
                 COUNT(*) as transaction_count,
-                SUM(paid_amount) as total_amount,
-                AVG(paid_amount) as avg_amount,
-                DATE(cp.created_at) as date
-            FROM crypto_payments 
-            WHERE status = 'confirmed' AND ${dateFilter}
-            GROUP BY currency, DATE(cp.created_at)
+                SUM(cp.PaidAmount) as total_amount,
+                AVG(cp.PaidAmount) as avg_amount,
+                CAST(cp.PaidAt AS DATE) as date
+            FROM reddog.CryptoPayments cp
+            WHERE cp.Status = 'confirmed' AND ${dateFilter}
+            GROUP BY cp.Currency, CAST(cp.PaidAt AS DATE)
             ORDER BY date DESC
         `;
 
