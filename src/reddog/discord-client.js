@@ -19,7 +19,7 @@ class DiscordClient {
     }
 
     setupEventHandlers() {
-        this.client.once('ready', async () => {
+        this.client.once('clientReady', async () => {
             console.log(`Discord: Logged in as ${this.client.user.tag}`);
             console.log(`Discord: Bot is in ${this.client.guilds.cache.size} servers`);
             this.client.guilds.cache.forEach(guild => {
