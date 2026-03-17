@@ -16,7 +16,7 @@ class AIEngine {
         this.sensorCommands = sensorCommands;
         this.schemaCache = null;
         this.model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
-        this.fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL || 'google/gemini-2.0-flash-exp:free';
+        this.fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
         this.apiKey = process.env.OPENROUTER_API_KEY;
         this.conversations = new Map(); // userId -> message history
         this.maxHistory = parseInt(process.env.CONVERSATION_HISTORY_LENGTH) || 20;
