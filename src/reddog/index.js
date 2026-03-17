@@ -156,6 +156,7 @@ async function main() {
     console.log(`Device Control: ${functionsClient.enabled ? 'LoRaWAN + WattWatchers' : 'Disabled'}`);
     console.log(`Sensor API:   ${sensorClient.enabled ? `APIM → per-farm Key Vault` : 'Disabled (set SENSOR_APIM_URL)'}`);
     console.log(`Twilio SMS:   ${process.env.TWILIO_ACCOUNT_SID ? 'Configured (webhook: /api/twilio/sms)' : 'Disabled'}`);
+    console.log(`SMS Service:  ${smsService.enabled ? `Twilio ready (from: ${smsService.fromNumber})` : 'Disabled'}`);
 
     // Graceful shutdown
     const shutdown = async () => {
