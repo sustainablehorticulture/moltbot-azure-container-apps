@@ -33,6 +33,21 @@ jobs:
       run: |
         az acr build --registry ${{ env.REGISTRY }} --image ${{ env.IMAGE_NAME }}:latest --file Dockerfile .
         
+    - name: Set Container App secrets
+      run: |
+        az containerapp secret set \
+          --name ${{ env.CONTAINER_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --secrets \
+            twilio-account-sid="${{ secrets.TWILIO_ACCOUNT_SID }}" \
+            twilio-auth-token="${{ secrets.TWILIO_AUTH_TOKEN }}" \
+            twilio-phone-number="${{ secrets.TWILIO_PHONE_NUMBER }}" \
+            alert-phone-number="${{ secrets.ALERT_PHONE_NUMBER }}" \
+            burro-api-base="${{ secrets.BURRO_API_BASE }}" \
+            burro-bearer-token="${{ secrets.BURRO_BEARER_TOKEN }}" \
+            planetary-computer-api-key="${{ secrets.PLANETARY_COMPUTER_API_KEY }}" \
+            slack-signing-secret="${{ secrets.SLACK_SIGNING_SECRET }}"
+
     - name: Deploy to Azure Container Apps
       run: |
         az containerapp update \
@@ -48,18 +63,3 @@ jobs:
             BURRO_BEARER_TOKEN=secretref:burro-bearer-token \
             PLANETARY_COMPUTER_API_KEY=secretref:planetary-computer-api-key \
             SLACK_SIGNING_SECRET=secretref:slack-signing-secret
-
-    - name: Set Container App secrets (idempotent)
-      run: |
-        az containerapp secret set \
-          --name ${{ env.CONTAINER_APP_NAME }} \
-          --resource-group ${{ env.RESOURCE_GROUP }} \
-          --secrets \
-            twilio-account-sid="${{ secrets.TWILIO_ACCOUNT_SID }}" \
-            twilio-auth-token="${{ secrets.TWILIO_AUTH_TOKEN }}" \
-            twilio-phone-number="${{ secrets.TWILIO_PHONE_NUMBER }}" \
-            alert-phone-number="${{ secrets.ALERT_PHONE_NUMBER }}" \
-            burro-api-base="${{ secrets.BURRO_API_BASE }}" \
-            burro-bearer-token="${{ secrets.BURRO_BEARER_TOKEN }}" \
-            planetary-computer-api-key="${{ secrets.PLANETARY_COMPUTER_API_KEY }}" \
-            slack-signing-secret="${{ secrets.SLACK_SIGNING_SECRET }}"
