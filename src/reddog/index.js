@@ -11,6 +11,7 @@ const SocialMediaManager = require('./social-media-manager');
 const AgentCommunicationManager = require('./agent-communication');
 const FunctionsClient = require('./functions-client');
 const DeviceCommands = require('./device-commands');
+const SMSService = require('./sms-service');
 const SensorAPIClient = require('./sensor-api-client');
 const SensorCommands = require('./sensor-commands');
 
@@ -101,8 +102,10 @@ async function main() {
     // 7. Initialize Azure Functions client and device commands
     console.log('Initializing device control...');
     const functionsClient = new FunctionsClient();
-    const deviceCommands = new DeviceCommands({ functionsClient });
+    const smsService = new SMSService();
+    const deviceCommands = new DeviceCommands({ functionsClient, smsService: smsService.enabled ? smsService : null });
     console.log('Device Control:', functionsClient.enabled ? `Connected (${functionsClient.baseUrl})` : 'Disabled (set AZURE_FUNCTIONS_URL + AZURE_FUNCTIONS_KEY)');
+    console.log('SMS Service:  ', smsService.enabled ? `Twilio ready (from: ${smsService.fromNumber})` : 'Disabled');
 
     // 7b. Initialize Sensor API client (APIM + per-farm Key Vault)
     console.log('Initializing sensor API client...');

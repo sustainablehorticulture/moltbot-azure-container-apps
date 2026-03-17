@@ -107,6 +107,26 @@ class APIServer {
             });
         });
 
+        // Twilio test endpoint — sends a test SMS to ALERT_PHONE_NUMBER
+        this.app.post('/api/twilio/test', async (req, res) => {
+            try {
+                const SMSService = require('./sms-service');
+                const sms = new SMSService();
+                if (!sms.enabled) {
+                    return res.status(503).json({ error: 'Twilio not configured — check TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER' });
+                }
+                const to = req.body?.to || process.env.ALERT_PHONE_NUMBER;
+                if (!to) {
+                    return res.status(400).json({ error: 'No target phone number — set ALERT_PHONE_NUMBER or pass { "to": "+61400000000" } in body' });
+                }
+                const sid = await sms.sendSMS(to, `🐾 Red Dog test SMS — Twilio is working! Sent at ${new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney' })}`);
+                res.json({ sent: true, to, sid });
+            } catch (err) {
+                console.error('[Twilio] Test SMS failed:', err.message);
+                res.status(500).json({ error: err.message });
+            }
+        });
+
         // Twilio SMS webhook — receives YES/NO replies for device command confirmation
         this.app.post('/api/twilio/sms', express.urlencoded({ extended: false }), async (req, res) => {
             try {
