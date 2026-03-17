@@ -9,7 +9,12 @@
         "Site Overview": "Overview of all farm sites/properties. Contains location, area, crops grown, energy systems, water schemes, and contact info.",
         "Site_Overview": "Alternative site overview table with similar data plus project IDs and Hort360 integration.",
         "Project_Site_Overview": "Detailed project and site data overview including capital costs, solar/battery systems, circuits, and production info.",
-        "site_reporting": "Reporting data by category, type, and site name."
+        "site_reporting": "Reporting data by category, type, and site name.",
+        "Course_Enrollments": "Agentic Ag education course enrollments. Columns: Id, FirstName, LastName, Email, Phone, DateOfBirth, CourseId, CourseName, CourseCategory (onsite|online), EnrollmentDate, Status (enrolled|completed|cancelled), PaymentMethod, StripeSessionId, CreatedDate. Use for insights on course signups, revenue, popular courses.",
+        "Farm_Products": "FarmGate marketplace product catalog and live stock levels. Columns: id, name, category, unit, price, stock, barcode, available (bit), updated_at. Use for product inventory, stock levels, pricing.",
+        "Product_CheckIn_Log": "FarmGate stock check-in history. Columns: id, product_id, product_name, category, quantity, unit, method, barcode, weight, notes, checked_in_by, checked_in_at. Use for stock movement history and trends.",
+        "Accommodations": "EcoStay accommodation listings. Columns: id, name, type, capacity, price_per_night, amenities, description, available (bit), image_url, created_at, updated_at.",
+        "Accommodation_Bookings": "EcoStay booking records. Columns: id, accommodation_id, check_in_date, check_out_date, status (confirmed|pending|cancelled), guest details, total_price, created_at. Use for occupancy, revenue, booking trends."
       },
       "farmLinkColumns": ["Farm", "Name", "Identifier", "Project"]
     },
@@ -30,6 +35,9 @@
     "When a user asks about weather, temperature, rain, wind, or sensor data at Grassgum Farm — query the 'Grassgum Farm' database.",
     "The 'Farm' column in Soil_Paddocks and the 'Name' column in Site Overview link to individual farm names like 'Grassgum Farm'.",
     "If a question spans both operational data AND sensor data, you may need to explain that the data comes from different databases and provide results from each.",
-    "Farm names in the database: 'Grassgum Farm', 'Zerosum Agriculture'."
+    "Farm names in the database: 'Grassgum Farm', 'Zerosum Agriculture'.",
+    "When a user asks about course enrollments, signups, or education revenue — query Course_Enrollments in zerosumag. Filter by CourseCategory='onsite' or 'online' to split on-site vs online.",
+    "When a user asks about FarmGate, marketplace products, stock levels, or inventory — query Farm_Products (current stock) and Product_CheckIn_Log (history) in zerosumag.",
+    "When a user asks about EcoStay, accommodation, bookings, or agritourism — query Accommodations and Accommodation_Bookings in zerosumag."
   ]
 }
