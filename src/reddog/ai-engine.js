@@ -16,6 +16,7 @@ class AIEngine {
         this.sensorCommands = sensorCommands;
         this.schemaCache = null;
         this.model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
+        this.fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL || 'google/gemini-2.0-flash-exp:free';
         this.apiKey = process.env.OPENROUTER_API_KEY;
         this.conversations = new Map(); // userId -> message history
         this.maxHistory = parseInt(process.env.CONVERSATION_HISTORY_LENGTH) || 20;
@@ -370,6 +371,38 @@ Conditional control examples:
         return unsafeKeywords.some(keyword => lowerSql.includes(keyword));
     }
 
+    async _callAI(messages, modelOverride = null) {
+        const primary = modelOverride || this.model;
+        try {
+            const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+                model: primary,
+                messages
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            return { data: response.data, usedFallback: false, model: primary };
+        } catch (err) {
+            const status = err.response?.status;
+            if ((status === 402 || status === 429) && this.fallbackModel && this.fallbackModel !== primary) {
+                console.warn(`[AI] ${status} on ${primary} — switching to fallback: ${this.fallbackModel}`);
+                const fallback = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+                    model: this.fallbackModel,
+                    messages
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                return { data: fallback.data, usedFallback: true, model: this.fallbackModel };
+            }
+            throw err;
+        }
+    }
+
     async chat(userMessage, userId = 'default') {
         try {
             // Handle special commands
@@ -430,15 +463,10 @@ Conditional control examples:
             ];
 
             // Step 1: Ask AI what to do
-            const firstResponse = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-                model: this.model,
-                messages
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            const firstResponse = await this._callAI(messages);
+            if (firstResponse.usedFallback) {
+                console.warn(`[AI] Using fallback model ${firstResponse.model} — top up OpenRouter credits at https://openrouter.ai/settings/credits`);
+            }
 
             const aiReply = firstResponse.data.choices[0].message.content;
 
@@ -582,20 +610,12 @@ Conditional control examples:
                         ? 'Query returned no results.'
                         : JSON.stringify(results.slice(0, 50), null, 2);
 
-                    const summaryResponse = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-                        model: this.model,
-                        messages: [
+                    const summaryResponse = await this._callAI([
                             { role: 'system', content: this.persona.summaryStyle },
                             { role: 'user', content: userMessage },
                             { role: 'assistant', content: `I ran this query: ${queryPlan.sql}` },
                             { role: 'user', content: `Here are the results:\n${resultText}\n\nPlease summarise these results for me.` }
-                        ]
-                    }, {
-                        headers: {
-                            'Authorization': `Bearer ${this.apiKey}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
+                        ]);
 
                     const summaryReply = summaryResponse.data.choices[0].message.content;
                     await this.addToHistory(userId, 'user', userMessage);
