@@ -158,6 +158,23 @@ async function main() {
     console.log(`Twilio SMS:   ${process.env.TWILIO_ACCOUNT_SID ? 'Configured (webhook: /api/twilio/sms)' : 'Disabled'}`);
     console.log(`SMS Service:  ${smsService.enabled ? `Twilio ready (from: ${smsService.fromNumber})` : 'Disabled'}`);
 
+    // Credit check
+    try {
+        const credits = await aiEngine.getCredits();
+        if (!credits.configured) {
+            console.warn('OpenRouter:   NOT configured (OPENROUTER_API_KEY missing)');
+        } else if (credits.error) {
+            console.warn(`OpenRouter:   Credit check failed — ${credits.error}`);
+        } else if (credits.low) {
+            console.warn(`OpenRouter:   *** LOW CREDITS *** remaining: $${credits.remaining?.toFixed(4)} / $${credits.limit} (used $${credits.usage})`);
+        } else {
+            const rem = credits.remaining !== null ? ` remaining: $${credits.remaining?.toFixed(4)}` : ' (no limit set)';
+            console.log(`OpenRouter:   ${credits.model}${rem} (used $${credits.usage})`);
+        }
+    } catch (e) {
+        console.warn('OpenRouter:   Credit check error:', e.message);
+    }
+
     // Graceful shutdown
     const shutdown = async () => {
         console.log('\nShutting down Red Dog...');

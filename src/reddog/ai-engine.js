@@ -646,6 +646,33 @@ Conditional control examples:
             };
         }
     }
+
+    async getCredits() {
+        if (!this.apiKey) {
+            return { configured: false };
+        }
+        try {
+            const response = await axios.get('https://openrouter.ai/api/v1/auth/key', {
+                headers: { Authorization: `Bearer ${this.apiKey}` },
+                timeout: 5000
+            });
+            const data = response.data?.data || {};
+            const limit = data.limit ?? null;
+            const usage = data.usage ?? 0;
+            const remaining = limit !== null ? Math.max(0, limit - usage) : null;
+            return {
+                configured: true,
+                model: this.model,
+                usage: parseFloat(usage.toFixed(6)),
+                limit,
+                remaining,
+                isFreeTier: data.is_free_tier || false,
+                low: remaining !== null && remaining < 1.0
+            };
+        } catch (err) {
+            return { configured: true, error: err.message };
+        }
+    }
 }
 
 module.exports = AIEngine;

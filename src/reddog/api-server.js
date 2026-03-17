@@ -94,17 +94,35 @@ class APIServer {
         this.app.use('/api/payments/crypto', createCryptoRoutes(this.db, this.serviceBus));
 
         // Health check
-        this.app.get('/health', (req, res) => {
+        this.app.get('/health', async (req, res) => {
             const BinancePay = require('./binance-pay');
             const binancePay = new BinancePay({ db: this.db, serviceBus: this.serviceBus });
+            const credits = await this.aiEngine.getCredits();
             
             res.json({
-                status: 'ok',
+                status: credits.low ? 'warning' : 'ok',
                 database: this.db ? this.db.isConnected : false,
                 databases: this.db ? Object.keys(this.db.pools) : [],
                 billing: this.billing.getStatus(),
-                binancePay: binancePay.getStatus()
+                binancePay: binancePay.getStatus(),
+                ai: {
+                    model: credits.model,
+                    usage: credits.usage,
+                    limit: credits.limit,
+                    remaining: credits.remaining,
+                    low: credits.low,
+                    error: credits.error
+                }
             });
+        });
+
+        // AI credit balance
+        this.app.get('/api/ai/credits', async (req, res) => {
+            const credits = await this.aiEngine.getCredits();
+            if (credits.low) {
+                console.warn('[AI] Low credits warning — remaining:', credits.remaining);
+            }
+            res.json(credits);
         });
 
         // Twilio test endpoint — sends a test SMS to ALERT_PHONE_NUMBER
@@ -743,6 +761,16 @@ class APIServer {
                             },
                             responses: {
                                 200: { description: 'Mission started', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/ai/credits': {
+                        get: {
+                            summary: 'OpenRouter credit balance',
+                            description: 'Check current OpenRouter API usage, credit limit, and remaining balance',
+                            tags: ['System'],
+                            responses: {
+                                200: { description: 'Credit info', content: { 'application/json': { schema: { type: 'object', properties: { configured: { type: 'boolean' }, model: { type: 'string' }, usage: { type: 'number' }, limit: { type: 'number' }, remaining: { type: 'number' }, low: { type: 'boolean' } } } } } }
                             }
                         }
                     },
