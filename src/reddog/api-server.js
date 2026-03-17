@@ -246,55 +246,70 @@ class APIServer {
         this.app.get('/api/chat/prompts', (req, res) => {
             res.json({
                 greeting: this.aiEngine?.persona?.greeting || "G'day! Give me a command!",
-                prompts: [
+                decisionTree: [
                     {
-                        id: 'realtime',
-                        label: '📡 Real time data treats',
-                        message: 'Show me the latest real-time sensor readings for the farm',
-                        category: 'sensors'
-                    },
-                    {
-                        id: 'insights',
-                        label: '📊 Long term insights',
-                        message: 'Give me long-term trends and analysis from the farm database',
-                        category: 'database'
+                        id: 'data',
+                        label: '� Farm Data',
+                        description: 'What would you like to know about the farm?',
+                        children: [
+                            { id: 'realtime', label: '📡 Live sensor readings', message: 'Show me the latest real-time sensor readings for the farm' },
+                            { id: 'insights', label: '� Long-term trends', message: 'Give me long-term trends and analysis from the farm database' },
+                            { id: 'ndvi', label: '🌱 Vegetation health (NDVI)', message: 'ndvi -29.80937 152.59111' },
+                            { id: 'smart-check', label: '🔍 Smart condition check', message: 'Check battery and soil conditions for automation suggestions' }
+                        ]
                     },
                     {
                         id: 'control',
-                        label: '🎛️ Control farm systems',
-                        message: 'What farm systems and devices can I control right now?',
-                        category: 'devices'
+                        label: '🎛️ Control Systems',
+                        description: 'What would you like to control?',
+                        children: [
+                            { id: 'devices', label: '⚡ View & control devices', message: 'What farm systems and devices can I control right now?' },
+                            { id: 'irrigate', label: '💧 Irrigate', message: 'Irrigate' },
+                            { id: 'switch-on', label: '🟢 Switch a system ON', message: 'Switch On' },
+                            { id: 'switch-off', label: '� Switch a system OFF', message: 'Switch Off' },
+                            { id: 'burro', label: '🤖 Launch Burro robot', message: 'launch-burro BURRO-001 -29.80937 152.59111' }
+                        ]
                     },
                     {
-                        id: 'trev',
-                        label: '🚜 Retrieve data for Trev',
-                        message: 'Fetch the latest farm data and send it to @Trevor',
-                        category: 'agents'
-                    },
-                    {
-                        id: 'courses',
-                        label: '🎓 Start a Course',
-                        message: 'Show me available courses on Agentic Ag',
-                        category: 'education'
-                    },
-                    {
-                        id: 'smart-check',
-                        label: '🔍 Smart Check',
-                        message: 'Check battery and soil conditions for automation suggestions',
-                        category: 'automation'
+                        id: 'agents',
+                        label: '🤝 Work with Agents',
+                        description: 'Which agent do you need?',
+                        children: [
+                            { id: 'trev-data', label: '🚜 Send data to Trevor', message: 'Fetch the latest farm data and send it to @Trevor' },
+                            { id: 'trev-quote', label: '📋 Ask Trevor for a quote', message: 'Ask Trevor to prepare a quote based on current farm data' },
+                            { id: 'control-centre', label: '🏠 Open Control Centre', message: 'Open Control Centre' }
+                        ]
                     },
                     {
                         id: 'social',
-                        label: '✨ Show off — post some tricks',
-                        message: null,
-                        category: 'social',
+                        label: '📣 Marketing & Social',
+                        description: 'What would you like to post or promote?',
                         children: [
                             { id: 'instagram', label: '📸 Post to Instagram', message: 'Create an Instagram post showcasing the farm' },
                             { id: 'facebook_ad', label: '📣 Run a Facebook Ad', message: 'Set up a Facebook ad campaign for the farm' },
                             { id: 'linkedin', label: '💼 Post to LinkedIn', message: 'Write a professional LinkedIn post about the farm' },
                             { id: 'whatsapp', label: '💬 Message the team on WhatsApp', message: 'Send a farm update to the team on WhatsApp' }
                         ]
+                    },
+                    {
+                        id: 'learn',
+                        label: '🎓 Learn',
+                        description: 'What would you like to learn about?',
+                        children: [
+                            { id: 'courses', label: '📚 Browse courses', message: 'Show me available courses on Agentic Ag' },
+                            { id: 'course-start', label: '▶️ Start a course', message: 'Start a beginner course on precision agriculture' }
+                        ]
                     }
+                ],
+                prompts: [
+                    { id: 'realtime', label: '📡 Live sensor data', message: 'Show me the latest real-time sensor readings for the farm', category: 'sensors' },
+                    { id: 'insights', label: '📊 Long term insights', message: 'Give me long-term trends and analysis from the farm database', category: 'database' },
+                    { id: 'control', label: '🎛️ Control farm systems', message: 'What farm systems and devices can I control right now?', category: 'devices' },
+                    { id: 'ndvi', label: '🌱 NDVI check', message: 'ndvi -29.80937 152.59111', category: 'sensors' },
+                    { id: 'trev', label: '🚜 Send data to Trev', message: 'Fetch the latest farm data and send it to @Trevor', category: 'agents' },
+                    { id: 'courses', label: '🎓 Start a Course', message: 'Show me available courses on Agentic Ag', category: 'education' },
+                    { id: 'smart-check', label: '🔍 Smart Check', message: 'Check battery and soil conditions for automation suggestions', category: 'automation' },
+                    { id: 'social', label: '✨ Social media', message: 'Create an Instagram post showcasing the farm', category: 'social' }
                 ]
             });
         });
