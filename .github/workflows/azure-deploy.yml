@@ -38,4 +38,28 @@ jobs:
         az containerapp update \
           --name ${{ env.CONTAINER_APP_NAME }} \
           --resource-group ${{ env.RESOURCE_GROUP }} \
-          --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+          --set-env-vars \
+            TWILIO_ACCOUNT_SID=secretref:twilio-account-sid \
+            TWILIO_AUTH_TOKEN=secretref:twilio-auth-token \
+            TWILIO_PHONE_NUMBER=secretref:twilio-phone-number \
+            ALERT_PHONE_NUMBER=secretref:alert-phone-number \
+            BURRO_API_BASE=secretref:burro-api-base \
+            BURRO_BEARER_TOKEN=secretref:burro-bearer-token \
+            PLANETARY_COMPUTER_API_KEY=secretref:planetary-computer-api-key \
+            SLACK_SIGNING_SECRET=secretref:slack-signing-secret
+
+    - name: Set Container App secrets (idempotent)
+      run: |
+        az containerapp secret set \
+          --name ${{ env.CONTAINER_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --secrets \
+            twilio-account-sid="${{ secrets.TWILIO_ACCOUNT_SID }}" \
+            twilio-auth-token="${{ secrets.TWILIO_AUTH_TOKEN }}" \
+            twilio-phone-number="${{ secrets.TWILIO_PHONE_NUMBER }}" \
+            alert-phone-number="${{ secrets.ALERT_PHONE_NUMBER }}" \
+            burro-api-base="${{ secrets.BURRO_API_BASE }}" \
+            burro-bearer-token="${{ secrets.BURRO_BEARER_TOKEN }}" \
+            planetary-computer-api-key="${{ secrets.PLANETARY_COMPUTER_API_KEY }}" \
+            slack-signing-secret="${{ secrets.SLACK_SIGNING_SECRET }}"
