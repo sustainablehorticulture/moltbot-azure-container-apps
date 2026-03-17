@@ -467,8 +467,8 @@ class APIServer {
                 openapi: '3.0.0',
                 info: {
                     title: 'Red Dog API',
-                    description: 'Agentic Ag farm data assistant — chat, sensors, devices, courses, billing, and social media',
-                    version: 'v90',
+                    description: 'Agentic Ag farm data assistant — chat, sensors, devices, courses, billing, social media, NDVI, Burro, Twilio SMS, and crypto payments',
+                    version: 'v91',
                     contact: {
                         name: 'Agentic Ag',
                         url: 'https://agentic.ag'
@@ -703,15 +703,388 @@ class APIServer {
                                 200: { description: 'Automation triggers', content: { 'application/json': { schema: { type: 'object' } } } }
                             }
                         }
+                    },
+                    '/farm/ndvi/latest': {
+                        get: {
+                            summary: 'Latest NDVI from Sentinel-2',
+                            description: 'Fetch latest Sentinel-2 NDVI value for a location via Microsoft Planetary Computer',
+                            tags: ['Farm'],
+                            parameters: [
+                                { name: 'lat', in: 'query', required: true, schema: { type: 'number' }, description: 'Latitude' },
+                                { name: 'lon', in: 'query', required: true, schema: { type: 'number' }, description: 'Longitude' },
+                                { name: 'buffer', in: 'query', schema: { type: 'number', default: 0.01 }, description: 'Bounding box buffer in degrees' }
+                            ],
+                            responses: {
+                                200: { description: 'NDVI result with value, date, and cloud cover', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/farm/burro/launch': {
+                        post: {
+                            summary: 'Launch Burro robot mission',
+                            description: 'Trigger an automated Burro electric robot unit to start a mission',
+                            tags: ['Farm'],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                burroId: { type: 'string', description: 'Burro unit ID e.g. BURRO-001' },
+                                                lat: { type: 'number', description: 'Target latitude' },
+                                                lon: { type: 'number', description: 'Target longitude' },
+                                                task: { type: 'string', description: 'Mission task description' }
+                                            },
+                                            required: ['burroId']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'Mission started', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/twilio/test': {
+                        post: {
+                            summary: 'Send test SMS',
+                            description: 'Send a test SMS via Twilio to verify configuration',
+                            tags: ['Twilio'],
+                            requestBody: {
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                to: { type: 'string', description: 'Target phone number (E.164). Defaults to ALERT_PHONE_NUMBER.' }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'SMS sent', content: { 'application/json': { schema: { type: 'object', properties: { sent: { type: 'boolean' }, to: { type: 'string' }, sid: { type: 'string' } } } } } },
+                                503: { description: 'Twilio not configured' }
+                            }
+                        }
+                    },
+                    '/twilio/sms': {
+                        post: {
+                            summary: 'Twilio inbound SMS webhook',
+                            description: 'Receives inbound YES/NO replies from Twilio for device command confirmation',
+                            tags: ['Twilio'],
+                            responses: {
+                                200: { description: 'TwiML response', content: { 'text/xml': { schema: { type: 'string' } } } }
+                            }
+                        }
+                    },
+                    '/payments/crypto/create': {
+                        post: {
+                            summary: 'Create crypto payment',
+                            description: 'Create a Binance Pay crypto payment and return payment URL + QR code',
+                            tags: ['Payments'],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                orderId: { type: 'string' },
+                                                amount: { type: 'number' },
+                                                currency: { type: 'string', default: 'USDT', description: 'BTC, ETH, USDT, BNB, ADA, DOT, LINK, BUSD' },
+                                                customerEmail: { type: 'string' },
+                                                productName: { type: 'string' }
+                                            },
+                                            required: ['orderId', 'amount', 'customerEmail']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'Payment created with URL and QR code', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/payments/crypto/status/{orderId}': {
+                        get: {
+                            summary: 'Check crypto payment status',
+                            description: 'Check the status of a Binance Pay crypto payment',
+                            tags: ['Payments'],
+                            parameters: [
+                                { name: 'orderId', in: 'path', required: true, schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Payment status', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/payments/crypto/webhook': {
+                        post: {
+                            summary: 'Binance Pay webhook',
+                            description: 'Receives payment confirmation from Binance Pay',
+                            tags: ['Payments'],
+                            responses: {
+                                200: { description: 'Acknowledged' }
+                            }
+                        }
+                    },
+                    '/billing/{userOid}': {
+                        get: {
+                            summary: 'Billing summary',
+                            description: 'Get billing summary and usage for a user',
+                            tags: ['Billing'],
+                            parameters: [
+                                { name: 'userOid', in: 'path', required: true, schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Billing summary', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/credits/{userOid}': {
+                        get: {
+                            summary: 'User credits',
+                            description: 'Get current credit balance for a user',
+                            tags: ['Billing'],
+                            parameters: [
+                                { name: 'userOid', in: 'path', required: true, schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Credit balance', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/billing/payment': {
+                        post: {
+                            summary: 'Create Stripe payment intent',
+                            description: 'Create a Stripe payment intent for credit top-up',
+                            tags: ['Billing'],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                userOid: { type: 'string' },
+                                                amount: { type: 'number' },
+                                                currency: { type: 'string', default: 'aud' }
+                                            },
+                                            required: ['userOid', 'amount']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'Payment intent created', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/billing/subscription': {
+                        post: {
+                            summary: 'Create subscription',
+                            description: 'Create a Stripe subscription for a user',
+                            tags: ['Billing'],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                userOid: { type: 'string' },
+                                                plan: { type: 'string', enum: ['free', 'agents', 'farmyard', 'enterprise'] },
+                                                paymentMethodId: { type: 'string' }
+                                            },
+                                            required: ['userOid', 'plan']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'Subscription created', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/billing/account': {
+                        post: {
+                            summary: 'Create user account',
+                            description: 'Create a new user billing account',
+                            tags: ['Billing'],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                userOid: { type: 'string' },
+                                                userEmail: { type: 'string' },
+                                                userName: { type: 'string' },
+                                                plan: { type: 'string' }
+                                            },
+                                            required: ['userOid', 'userEmail']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'Account created', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/sensors/farms': {
+                        get: {
+                            summary: 'List sensor farms',
+                            description: 'List all farms with sensor access configured',
+                            tags: ['Sensors'],
+                            responses: {
+                                200: { description: 'Farm list', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/sensors/all/latest': {
+                        get: {
+                            summary: 'Latest readings — all farms',
+                            description: 'Get latest sensor readings across all accessible farms',
+                            tags: ['Sensors'],
+                            responses: {
+                                200: { description: 'All farms sensor data', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/sensors/{farm}/history': {
+                        get: {
+                            summary: 'Sensor history',
+                            description: 'Get historical sensor readings for a farm',
+                            tags: ['Sensors'],
+                            parameters: [
+                                { name: 'farm', in: 'path', required: true, schema: { type: 'string' } },
+                                { name: 'provider', in: 'query', schema: { type: 'string' } },
+                                { name: 'from', in: 'query', schema: { type: 'string', format: 'date-time' } },
+                                { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } }
+                            ],
+                            responses: {
+                                200: { description: 'Historical readings', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/sensors/{farm}/vault': {
+                        get: {
+                            summary: 'Farm Key Vault name',
+                            description: 'Get the Azure Key Vault name for a farm',
+                            tags: ['Sensors'],
+                            parameters: [
+                                { name: 'farm', in: 'path', required: true, schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Key Vault name', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/databases': {
+                        get: {
+                            summary: 'List databases',
+                            description: 'List all connected database instances',
+                            tags: ['Database'],
+                            responses: {
+                                200: { description: 'Database list', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/tables': {
+                        get: {
+                            summary: 'List tables',
+                            description: 'List all tables in the active database',
+                            tags: ['Database'],
+                            responses: {
+                                200: { description: 'Table list', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/tables/{database}': {
+                        get: {
+                            summary: 'List tables by database',
+                            description: 'List all tables in a specific database',
+                            tags: ['Database'],
+                            parameters: [
+                                { name: 'database', in: 'path', required: true, schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Table list', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/tables/{database}/{table}': {
+                        get: {
+                            summary: 'Table schema',
+                            description: 'Get column definitions for a specific table',
+                            tags: ['Database'],
+                            parameters: [
+                                { name: 'database', in: 'path', required: true, schema: { type: 'string' } },
+                                { name: 'table', in: 'path', required: true, schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Column schema', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/devices/lorawan/{deviceId}/relay': {
+                        post: {
+                            summary: 'Control LoRaWAN relay',
+                            description: 'Send a relay on/off command to a LoRaWAN device',
+                            tags: ['Devices'],
+                            parameters: [
+                                { name: 'deviceId', in: 'path', required: true, schema: { type: 'string' } }
+                            ],
+                            requestBody: {
+                                required: true,
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                relayId: { type: 'integer' },
+                                                state: { type: 'boolean', description: 'true = ON, false = OFF' }
+                                            },
+                                            required: ['relayId', 'state']
+                                        }
+                                    }
+                                }
+                            },
+                            responses: {
+                                200: { description: 'Command sent', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
+                    },
+                    '/devices/wattwatchers/{deviceId}/energy': {
+                        get: {
+                            summary: 'WattWatchers energy data',
+                            description: 'Get latest energy readings for a WattWatchers device',
+                            tags: ['Devices'],
+                            parameters: [
+                                { name: 'deviceId', in: 'path', required: true, schema: { type: 'string' } },
+                                { name: 'siteId', in: 'query', schema: { type: 'string' } }
+                            ],
+                            responses: {
+                                200: { description: 'Energy data', content: { 'application/json': { schema: { type: 'object' } } } }
+                            }
+                        }
                     }
                 },
                 tags: [
                     { name: 'Chat', description: 'Conversational AI interface' },
+                    { name: 'Farm', description: 'NDVI, Burro robot, and farm intelligence' },
                     { name: 'Courses', description: 'Adaptive learning system' },
-                    { name: 'Sensors', description: 'Real-time sensor data' },
-                    { name: 'Devices', description: 'Device control and status' },
-                    { name: 'Database', description: 'SQL queries and schema' },
+                    { name: 'Sensors', description: 'Real-time and historical sensor data' },
+                    { name: 'Devices', description: 'LoRaWAN and WattWatchers device control' },
+                    { name: 'Database', description: 'SQL queries, schema, and tables' },
                     { name: 'Automation', description: 'Smart automation triggers' },
+                    { name: 'Twilio', description: 'SMS alerts and device command confirmation' },
+                    { name: 'Payments', description: 'Binance Pay crypto payments' },
+                    { name: 'Billing', description: 'Stripe subscriptions and credit management' },
                     { name: 'System', description: 'Health and diagnostics' }
                 ]
             };
