@@ -1,0 +1,44 @@
+name: Build and push to ECR
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-southeast-2
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t agenticag-reddog:latest .
+        working-directory: ${{ github.workspace }}
+
+      - name: Tag Docker image
+        run: |
+          docker tag agenticag-reddog:latest ${{ steps.login-ecr.outputs.registry }}/agenticag-reddog:latest
+          docker tag agenticag-reddog:latest ${{ steps.login-ecr.outputs.registry }}/agenticag-reddog:${{ github.sha }}
+
+      - name: Push to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/agenticag-reddog:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/agenticag-reddog:${{ github.sha }}
